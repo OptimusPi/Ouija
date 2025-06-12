@@ -1,0 +1,21 @@
+[project]
+name = "ouija"
+version = "3.1.4"
+description = "Balatro seed searcher UI by pifreak"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=0.8.1",
+    "pandas>=2.0.0", 
+    "tksheet>=6.2.5",
+    "sv-ttk>=2.5.0",
+    "matplotlib>=3.0.0",
+    "numexpr>=2.7.0",
+    "openpyxl>=3.0.0",
+    "xlrd>=2.0.0",
+    "xlsxwriter>=3.0.0",
+    "pillow>=8.0.0",
+    "pandastable>=0.13.0"
+]
+
+
+

@@ -1,0 +1,7 @@
+/Ouija-cli/build
+*.bin
+/Ouija-cli/ouija_csv_exports
+*.toc
+*.pyc
+/Ouija-ui/build
+*.spec

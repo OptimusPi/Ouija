@@ -1,0 +1,31 @@
+{
+    "name": "egg",
+    "description": "Filter configuration created by Ouija GUI",
+    "author": "Ouija GUI User",
+    "filter_config": {
+        "numNeeds": 1,
+        "numWants": 2,
+        "Needs": [
+            {
+                "value": "Egg",
+                "jokeredition": "No_Edition",
+                "desireByAnte": 8
+            }
+        ],
+        "Wants": [
+            {
+                "value": "Egg",
+                "jokeredition": "No_Edition"
+            },
+            {
+                "value": "Certificate",
+                "jokeredition": "Negative"
+            }
+        ],
+        "maxSearchAnte": 8,
+        "deck": "Red_Deck",
+        "stake": "White_Stake",
+        "scoreNaturalNegatives": false,
+        "scoreDesiredNegatives": false
+    }
+}

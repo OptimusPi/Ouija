@@ -1,0 +1,21 @@
+# Core dependencies
+duckdb>=0.8.1
+pandas>=2.0.0
+tksheet>=6.2.5
+sv-ttk>=2.5.0
+
+# Visualization dependencies (required by pandastable)
+matplotlib>=3.0.0
+numexpr>=2.7.0
+
+# Excel support for data export
+openpyxl>=3.0.0
+xlrd>=2.0.0
+xlsxwriter>=3.0.0
+
+# UI theme and styling
+pillow>=8.0.0
+pandastable>=0.13.0
+
+# Build dependencies
+pyinstaller>=5.0.0
