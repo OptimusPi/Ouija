@@ -5,10 +5,10 @@ Build Controller - Handles kernel build operations
 import json
 import os
 import subprocess
-import threading
+import threading                    
 
 from utils.result import Result
-
+from utils.version_manager import version_manager
 
 class BuildController:
     """Controller for build operations"""
@@ -36,11 +36,9 @@ class BuildController:
                 if conf.get('installation_success'):
                     return False
         except Exception:
-            pass
-
-        # Check for Ouija-CLI.exe and at least one .bin kernel file
+            pass        # Check for Ouija-CLI.exe and at least one .bin kernel file
         exe_path = os.path.join(os.getcwd(), 'Ouija-CLI.exe')
-        kernels_dir = os.path.join(os.getcwd(), 'filters')
+        kernels_dir = os.path.join(os.getcwd(), 'ouija_filters')
         has_exe = os.path.exists(exe_path)
         has_bin = False
 
@@ -63,7 +61,8 @@ class BuildController:
         """
         if self.build_running:
             if self.current_view:
-                self.current_view.write_to_console("[Info] Kernel build already running.\n", color="white")
+                self.current_view.write_to_console(
+                    "[Info] Kernel build already running.\n", color="white")
             return Result.error("Kernel build already running")
 
         self.build_running = True
@@ -83,45 +82,72 @@ class BuildController:
             return Result.error(f"Failed to start kernel build: {str(e)}")
 
     def _run_build_script(self, on_complete=None):
-        """Run build.ps1 -PrecompileKernels and stream output to the console
+        """Run precompile_kernels.ps1 -PrecompileKernels and stream output to the console
         
         Args:
             on_complete (callable, optional): Callback when build completes
-        """
-
+        """        
         def run_and_stream():
             try:
-                # Use subprocess.Popen to run the build script and stream output
-                process = subprocess.Popen([
-                    'powershell', '-ExecutionPolicy', 'Bypass', '-File', 'build.ps1', '-PrecompileKernels'
-                ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, cwd=os.getcwd())
+                current_build_script = 'precompile_kernels.ps1'
+
+                build_script_path = None
+                working_dir = None
+
+                if os.path.exists(current_build_script):
+                    # Installed environment - build script in current directory
+                    build_script_path = current_build_script
+                    working_dir = os.getcwd()
+                else:
+                    error_msg = f"No build.ps1 script found.\n"
+                    raise FileNotFoundError(error_msg)
 
                 if self.current_view:
-                    self.current_view.write_to_console("\n⚙️ Running kernel build...\n", color="white")
+                    self.current_view.write_to_console(
+                        f"\n⚙️ Running kernel build from: {working_dir}\n",
+                        color="white")
+
+                # Use subprocess.Popen to run the build script and stream output
+                process = subprocess.Popen([
+                    'powershell', '-ExecutionPolicy', 'Bypass', '-File',
+                    build_script_path, '-PrecompileKernels'
+                ],
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.STDOUT,
+                                           text=True,
+                                           cwd=working_dir)
+
+                if self.current_view:
+                    self.current_view.write_to_console(
+                        "\n⚙️ Running kernel build...\n", color="white")
 
                 for line in process.stdout:
                     if self.current_view:
                         # Ensure each output ends with a newline
                         if not line.endswith('\n'):
                             line += '\n'
-                            self.current_view.write_to_console(line, color="blue")
+                            self.current_view.write_to_console(line,
+                                                               color="blue")
 
                 process.wait()
 
                 if process.returncode == 0:
                     if self.current_view:
-                        self.current_view.write_to_console("\n✅ Kernel build complete!\n", color="green")
+                        self.current_view.write_to_console(
+                            "\n✅ Kernel build complete!\n", color="green")
                     self._mark_installation_success()
                 else:
                     if self.current_view:
-                        self.current_view.write_to_console("\n❌ Kernel build failed!\n", color="red")
+                        self.current_view.write_to_console(
+                            "\n❌ Kernel build failed!\n", color="red")
 
                 if on_complete:
                     on_complete()
 
             except Exception as e:
                 if self.current_view:
-                    self.current_view.write_to_console(f"[Error] Kernel build crashed: {e}\n", color="red")
+                    self.current_view.write_to_console(
+                        f"[Error] Kernel build crashed: {e}\n", color="red")
                 if on_complete:
                     on_complete()
 
@@ -145,7 +171,9 @@ class BuildController:
 
         except Exception as e:
             if self.current_view:
-                self.current_view.write_to_console(f"[Warning] Could not update user.ouija.conf: {e}\n", color="red")
+                self.current_view.write_to_console(
+                    f"[Warning] Could not update user.ouija.conf: {e}\n",
+                    color="red")
 
     def is_build_running(self):
         """Check if a build is currently running

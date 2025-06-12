@@ -149,44 +149,9 @@ class SearchController:
         else:
             # Regular console output - determine color based on content source
             # If a color is passed directly, use it, otherwise determine it.
-            message_color = color if color else self._determine_message_color(line)
+            message_color = color if color else "white"
             self.current_view.write_to_console(line, color=message_color)
 
-    def _determine_message_color(self, line):
-        """Determine the appropriate color for a console message based on its source and content
-        
-        Args:
-            line: The console message line
-            
-        Returns:
-            str: Color code ("white", "blue", "red")
-        """
-        line_lower = line.lower().strip()
-        
-        # RED: Error messages and stderr output
-        if any(keyword in line_lower for keyword in [
-            "error", "failed", "exception", "traceback", "warning", 
-            "❌", "⚠️", "crash", "abort", "timeout"
-        ]):
-            return "red"
-        
-        # BLUE: Ouija-CLI messages (status, progress, CSV results, speedometer)
-        if any(keyword in line_lower for keyword in [
-            "seeds/sec", "speed:", "eta:", "progress:", "found:", "searched:",
-            "csv", "result", "joker", "seed:", "ante:", "score:", "filters:",
-            "command:", "working dir:", "ouija-cli", "initializing", "loading",
-            "⚡", "🎯", "📊", "🔍", "💫", "speedometer"
-        ]):
-            return "blue"
-        
-        # BLUE: Lines that look like CSV headers or data
-        if ("," in line and any(keyword in line_lower for keyword in [
-            "seed", "ante", "score", "joker", "filter"
-        ])):
-            return "blue"
-        
-        # WHITE: Default for Ouija UI messages
-        return "white"
 
     def _handle_status_message(self, line):
         """Handle status message formatting"""
@@ -225,6 +190,7 @@ class SearchController:
             parts = status_message.split(":clock:")
             if len(parts) == 2:
                 self.current_view.set_status(parts[0].strip())
+                
                 self.current_view.set_metrics(f"⏱️{parts[1].strip()}")
             else:
                 self.current_view.set_status(status_message)

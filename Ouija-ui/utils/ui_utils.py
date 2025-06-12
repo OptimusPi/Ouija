@@ -138,22 +138,21 @@ class StatusBar(tk.Frame):
         Args:
             master: Parent widget
         """
-        tk.Frame.__init__(self, master)
-
-        # Main status label (left-aligned)
+        tk.Frame.__init__(self, master)        
+        # Main status label (left-aligned) with extra padding for emojis
         self.status_label = tk.Label(self, bd=1, relief=tk.SUNKEN, anchor=tk.W,
-                                     bg=DARK_BACKGROUND, fg=LIGHT_TEXT, font=("m6x11", 13))
+                                     bg=DARK_BACKGROUND, fg=LIGHT_TEXT, font=("m6x11", 12))
         self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # Right-aligned metrics label (for search speed, etc.)
         # Reduce width from 20 to 15 characters
         self.metrics_label = tk.Label(self, bd=1, relief=tk.SUNKEN, anchor=tk.E,
-                                      bg=DARK_BACKGROUND, fg=LIGHT_TEXT, width=15, font=("m6x11", 13))
+                                      bg=DARK_BACKGROUND, fg=LIGHT_TEXT, width=15, font=("m6x11", 12))
         self.metrics_label.pack(side=tk.RIGHT, fill=tk.NONE)
 
         # Initialize with default values
         self.set_status("Ready")
-        self.set_metrics("pi❤️u")
+        self.set_metrics("⏱️Ready!")
 
     def set_status(self, text):
         """Set the main status text (left-aligned)

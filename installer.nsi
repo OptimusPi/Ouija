@@ -35,15 +35,8 @@ RequestExecutionLevel admin
 !define MUI_FINISHPAGE_RUN "$INSTDIR\Ouija-UI.exe"
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\README.md"
 !define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
-
-# Add kernel precompilation checkbox option
-!define MUI_FINISHPAGE_RUN_FUNCTION "LaunchApplication"
 !define MUI_FINISHPAGE_RUN_TEXT "Start ${APP_NAME}"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
-!define MUI_FINISHPAGE_CHECKBOX
-!define MUI_FINISHPAGE_CHECKBOX_TEXT "Precompile OpenCL kernels for faster startup (recommended)"
-!define MUI_FINISHPAGE_CHECKBOX_CHECKED
-!define MUI_FINISHPAGE_FUNCTION_CHECKBOX "RunKernelPrecompilation"
 
 !insertmacro MUI_PAGE_FINISH
 
@@ -73,7 +66,7 @@ Section "Core Application" SecCore
     File "/oname=Ouija-CLI.exe" "distribution\Ouija-v${APP_VERSION}-Windows\Ouija-CLI.exe"
     File "/oname=README.md" "distribution\Ouija-v${APP_VERSION}-Windows\README.md"
     File "/oname=user.ouija.conf" "distribution\Ouija-v${APP_VERSION}-Windows\user.ouija.conf"
-    File "/oname=build.ps1" "distribution\Ouija-v${APP_VERSION}-Windows\build.ps1"
+    File "/oname=precompile_kernels.ps1" "distribution\Ouija-v${APP_VERSION}-Windows\precompile_kernels.ps1"
     # Directories
     SetOutPath "$INSTDIR\lib"
     File /r "distribution\Ouija-v${APP_VERSION}-Windows\lib\*.*"
@@ -81,39 +74,6 @@ Section "Core Application" SecCore
     File /r "distribution\Ouija-v${APP_VERSION}-Windows\ouija_filters\*.*"
     SetOutPath "$INSTDIR\ouija_configs"
     File /r "distribution\Ouija-v${APP_VERSION}-Windows\ouija_configs\*.*"
-    # Create simple kernel precompilation batch file that just calls build.ps1
-    FileOpen $0 "$INSTDIR\precompile_kernels.cmd" w
-    FileWrite $0 "@echo off$\r$\n"
-    FileWrite $0 "title Ouija OpenCL Kernel Precompilation$\r$\n"
-    FileWrite $0 "echo ======================================================$\r$\n"
-    FileWrite $0 "echo        Ouija OpenCL Kernel Precompilation Tool$\r$\n"
-    FileWrite $0 "echo ======================================================$\r$\n"
-    FileWrite $0 "echo.$\r$\n"
-    FileWrite $0 "echo This process will improve Ouija's startup performance$\r$\n"
-    FileWrite $0 "echo by precompiling all OpenCL kernels for your GPU.$\r$\n"
-    FileWrite $0 "echo.$\r$\n"
-    FileWrite $0 "cd /d $\"$INSTDIR$\"$\r$\n"
-    FileWrite $0 "echo Checking GPU compatibility...$\r$\n"
-    FileWrite $0 "$\"$INSTDIR\Ouija-CLI.exe$\" --list_devices$\r$\n"
-    FileWrite $0 "if %ERRORLEVEL% neq 0 ($\r$\n"
-    FileWrite $0 "  echo.$\r$\n"
-    FileWrite $0 "  echo ERROR: No compatible OpenCL GPU detected.$\r$\n"
-    FileWrite $0 "  echo Please update your graphics drivers and try again.$\r$\n"
-    FileWrite $0 "  echo.$\r$\n"
-    FileWrite $0 "  pause$\r$\n"
-    FileWrite $0 "  exit /b 1$\r$\n"
-    FileWrite $0 ")$\r$\n"
-    FileWrite $0 "echo.$\r$\n"
-    FileWrite $0 "echo Running kernel precompilation using build.ps1...$\r$\n"
-    FileWrite $0 "powershell -ExecutionPolicy Bypass -NoProfile -Command $\"& '$INSTDIR\build.ps1' -PrecompileKernels$\"$\r$\n"
-    FileWrite $0 "echo.$\r$\n"
-    FileWrite $0 "echo ======================================================$\r$\n"
-    FileWrite $0 "echo       Kernel precompilation process completed!$\r$\n"
-    FileWrite $0 "echo     Ouija will now start faster on your system.$\r$\n"
-    FileWrite $0 "echo ======================================================$\r$\n"
-    FileWrite $0 "echo.$\r$\n"
-    FileWrite $0 "pause$\r$\n"
-    FileClose $0
     
     # Registry entries
     WriteRegStr HKLM "Software\${APP_NAME}" "InstallDir" "$INSTDIR"
@@ -147,7 +107,6 @@ Section "Start Menu Shortcuts" SecStartMenu
     CreateShortCut "$SMPROGRAMS\${APP_NAME}\${APP_NAME} CLI.lnk" "$INSTDIR\Ouija-CLI.exe"
     CreateShortCut "$SMPROGRAMS\${APP_NAME}\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
     CreateShortCut "$SMPROGRAMS\${APP_NAME}\README.lnk" "$INSTDIR\README.md"
-    CreateShortCut "$SMPadROGRAMS\${APP_NAME}\Precompile OpenCL Kernels.lnk" "$INSTDIR\precompile_kernels.cmd" "" "$INSTDIR\icon.ico"
 SectionEnd
 
 Section "Sample Database" SecDatabase
@@ -228,7 +187,7 @@ Section "Uninstall"    # Remove files
     Delete "$INSTDIR\README.md"
     Delete "$INSTDIR\LICENSE"
     Delete "$INSTDIR\Uninstall.exe"
-    Delete "$INSTDIR\build.ps1"
+    Delete "$INSTDIR\precompile_kernels.ps1"
     Delete "$INSTDIR\precompile_kernels.ps1"
     Delete "$INSTDIR\precompile_kernels.cmd"
     Delete "$INSTDIR\icon.ico"
@@ -250,45 +209,13 @@ Section "Uninstall"    # Remove files
     RMDir "$INSTDIR"
 SectionEnd
 
-# Custom functions for the finish page
-Function LaunchApplication
-    # Check if kernel precompilation was selected
-    ${If} ${MUI_FINISHPAGE_CHECKBOX_STATE} == ${BST_CHECKED}
-        # Let the user know we're waiting for precompilation
-        MessageBox MB_ICONINFORMATION|MB_OK "Ouija UI will launch after a short delay to allow kernel precompilation to begin. For best performance, allow the precompilation process to complete before using the application."
-        
-        # Wait a moment to allow kernel precompilation to start
-        Sleep 2000
-    ${EndIf}
-    
-    # Launch the application
-    ExecShell "open" "$INSTDIR\Ouija-UI.exe"
-FunctionEnd
 
-Function RunKernelPrecompilation
-    # Show message to inform user about kernel precompilation
-    MessageBox MB_ICONINFORMATION|MB_OK "OpenCL kernel precompilation will run in a separate window.$\n$\nThis process may take a minute but will significantly improve application startup performance.$\n$\nPlease wait for the precompilation window to complete before using the application."
-    
-    DetailPrint "Starting OpenCL kernel precompilation..."
-    SetDetailsPrint both
-    
-    # Check if GPU is available first
-    ExecWait '"$INSTDIR\Ouija-CLI.exe" --list_devices' $0
-    ${If} $0 != 0
-        MessageBox MB_OK|MB_ICONEXCLAMATION "No OpenCL-compatible GPU was detected. Kernel precompilation may not be possible. You can try updating your graphics drivers and run precompilation later using the Start menu shortcut."
-    ${Else}
-        # Create a Start Menu shortcut for precompilation
-        CreateShortCut "$SMPROGRAMS\${APP_NAME}\Precompile Kernels.lnk" "$INSTDIR\precompile_kernels.cmd"
-        
-        # Execute the precompilation script
-        ExecShell "open" "$INSTDIR\precompile_kernels.cmd" "" SW_SHOW
-        
-        DetailPrint "Kernel precompilation started in a separate window."
-        DetailPrint "The application will be ready to use when precompilation completes."
-    ${EndIf}
-    
-    SetDetailsPrint none
-FunctionEnd
+
+
+
+
+
+
 
 
 

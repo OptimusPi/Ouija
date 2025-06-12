@@ -106,15 +106,15 @@ class SearchModel:
             # Log and execute the command
             command = " ".join(command_parts)
             if self.console_callback:
-                self.console_callback(f"COMMAND: {command}\n")
-                self.console_callback(f"WORKING DIR: {os.getcwd()}\n")
-
+                self.console_callback(f"{command}\n")     
             process = subprocess.Popen(
                 command_parts,
                 shell=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding='utf-8',
+                errors='ignore',
                 cwd=os.getcwd()
             )
             self.active_processes.append(process)
@@ -167,7 +167,14 @@ class SearchModel:
                 # Check if process has terminated
                 if process.poll() is not None:
                     break
-                line = process.stdout.readline()
+                try:
+                    line = process.stdout.readline()
+                    if isinstance(line, bytes):
+                        # Handle bytes with proper encoding, ignoring problematic characters
+                        line = line.decode('utf-8', errors='ignore')
+                except UnicodeDecodeError:
+                    # Skip lines that can't be decoded
+                    continue
 
                   # Parse CSV header
                 if not header_found and line.strip().startswith("+Seed,"):
@@ -353,15 +360,13 @@ class SearchModel:
         except Exception as e:
             if self.console_callback:
                 self.console_callback(f"Error processing CSV line: {e}\n")
-                
+              
     def _process_status_line(self, line: str):
         """Process a status line from the CLI"""
         if self.console_callback:
-            # Remove the "$" prefix and format the status message
+            # Remove the "$" prefix and pass the raw status message to controller
+            # The controller will handle all formatting including :clock: replacement
             status_message = line.strip()[1:].strip()
-            if "$clock$" in status_message:
-                parts = status_message.split("$clock$")
-                status_message = f"{parts[0].strip()} ⏱️{parts[1].strip()}"
             self.console_callback(f"STATUS:{status_message}\n")
     
     def _parse_seed_count_shorthand(self, s_val):

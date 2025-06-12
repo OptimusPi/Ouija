@@ -575,7 +575,7 @@ int main(int argc, char **argv)
                 snprintf(searched_string, sizeof(searched_string), "%" PRId64, total_processed);
             }
               // Enhanced progress reporting with new format
-            printf_s("Found %" PRId64 " valid seeds of %s searched so far. (%.8f%% Rarity!) %s. %s :clock: %.1fK/s\n",
+            printf_s("$Found %" PRId64 " valid seeds of %s searched so far. (%.8f%% Rarity!) %s. %s :clock: %.1fK/s\n",
                      total_found, searched_string, rarity_percent, elapsed_string, eta_string, rate / 1000.0);
                     
             fflush(stdout);

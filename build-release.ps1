@@ -154,9 +154,9 @@ if (Test-Path $OuijaUIExePath) {
     }
 }
 
-# Copy build.ps1 to the distribution package so the installer can offer kernel precompilation
-Copy-Item (Join-Path $CLIDir "build.ps1") (Join-Path $PackageDir "build.ps1") -Force
-Write-Host "✅ build.ps1 copied for installer kernel precompilation option" -ForegroundColor Green
+# Copy precompile_kernels.ps1 to the distribution package so the installer can offer kernel precompilation
+Copy-Item (Join-Path $CLIDir "precompile_kernels.ps1") (Join-Path $PackageDir "precompile_kernels.ps1") -Force
+Write-Host "✅ precompile_kernels.ps1 copied for installer kernel precompilation option" -ForegroundColor Green
 
 # Copy user.ouija.conf as an example configuration
 $UserConf = Join-Path $RootDir "user.ouija.conf"

@@ -144,7 +144,7 @@ class SubprocessOutputManager:
                     # Also send to console if available
                     if self.console_manager and self.console_manager.console_allocated:
                         try:
-                            print(f"ERROR: {line.rstrip('\n')}", file=sys.stderr, flush=True)
+                            print("ERROR: " + line.rstrip('\n'), file=sys.stderr, flush=True)
                         except:
                             pass
                             

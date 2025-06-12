@@ -88,8 +88,7 @@ class MainWindow:
         
         # Log if we're running in a PyInstaller bundle
         if getattr(sys, 'frozen', False):
-            print("📦 Running as PyInstaller executable")
-        # Initialize the UI with current settings
+            print("📦 Running as PyInstaller executable")        # Initialize the UI with current settings
         self.update_config_display()
         self.update_criteria_display()
 
@@ -102,8 +101,10 @@ class MainWindow:
 
         # Add to __init__
         self._debounce_table_update_id = None
+        
+        # Check kernel status and update button accordingly
+        self.update_kernel_button_state()
         self._pending_table_df = None
-        self._debounce_interval_ms = 1000
         self._status_update_id = None
         self._last_results_count = 0
         self._search_results_count = 0
@@ -726,13 +727,13 @@ class MainWindow:
         # The secret button
         self.secret_button = tk.Button(
             right_buttons,
-            text="❤️pifreak loves you!",
+            text="Click Me for a fun time",
             bg="#FF6F61",  # Coral color
             fg="#020403",  # Dark 
             font=("m6x11", 10),
             command=self.on_secret_button_clicked,
         )
-        self.secret_button.pack(side=tk.RIGHT)
+        self.secret_button.pack(side=tk.RIGHT, padx=2)
 
         # Hidden fun buttons frame (initially hidden)
         self.fun_buttons_frame = tk.Frame(button_row, bg=BACKGROUND)
@@ -874,8 +875,13 @@ class MainWindow:
         else:
             self.pt.model.df = pd.DataFrame()
 
-        self.pt.redraw()
-        self._adjust_table_column_widths()
+        try:
+            self.pt.redraw()
+            self._adjust_table_column_widths()
+        except (IndexError, AttributeError) as e:
+            # Handle IndexError when clicking on empty table or AttributeError for missing data
+            # This prevents crashes when the pandastable tries to access non-existent rows
+            pass
         self._search_results_count = len(dataframe) if dataframe is not None else 0
 
     def refresh_results_table(self):
@@ -910,14 +916,14 @@ class MainWindow:
             is_running: Boolean indicating if search is running
         """
         if self.search_running == is_running:
-            return  # Prevent duplicate finish/stop messages
-        self.search_running = is_running
+            return  # Prevent duplicate finish/stop messages        self.search_running = is_running
         if is_running:
             self.run_button.config(text="STOP SEARCH", bg=RED)
             self._search_start_time = time.time()
             self._search_results_count = 0
         else:
-            self.run_button.config(text="Let Jimbo Cook!", bg=BLUE)            
+            # Check kernel status when search stops to set appropriate button text
+            self.update_kernel_button_state()
             if self._search_start_time is not None:
                 elapsed = time.time() - self._search_start_time
                 self.write_to_console(
@@ -1233,11 +1239,57 @@ class MainWindow:
                                "Are you sure you want to clear all criteria?"):
             self.controller.clear_all_criteria()
 
+    def update_kernel_button_state(self):
+        """Check kernel status and update the run button text accordingly"""
+        try:
+            if self.controller.is_kernel_build_needed():
+                self.run_button.config(text="Finish GPU Setup...", bg="#FF8C00")  # Orange color
+                self.set_status("⚙️ GPU kernel setup required - click 'Finish GPU Setup...' to compile OpenCL kernels")
+            else:
+                self.run_button.config(text="Let Jimbo Cook!", bg=BLUE)
+                self.set_status("✅ GPU kernels ready - ready to search!")
+        except Exception as e:
+            self.write_to_console(f"⚠️ Warning: Could not check kernel status: {e}\n", color="red")            # Default to normal state if we can't check
+            self.run_button.config(text="Let Jimbo Cook!", bg=BLUE)
+
+    def run_kernel_build(self):
+        """Run kernel build process with UI feedback"""
+        def on_build_complete():
+            """Callback when kernel build completes"""
+            self.write_to_console("🎯 GPU kernel setup complete! Ready to search.\n", color="green")
+            self.update_kernel_button_state()  # Update button back to normal
+            self.set_status("✅ GPU kernels compiled successfully - ready to search!")
+
+        self.write_to_console("🔧 Starting GPU kernel compilation...\n", color="white")
+        self.set_status("⚙️ Compiling OpenCL kernels... Please wait...")
+        
+        # Disable the button during build
+        self.run_button.config(text="Building Kernels...", state="disabled", bg="#808080")
+        
+        # Start the kernel build
+        try:
+            success = self.controller.run_kernel_build(on_complete=on_build_complete)
+            if not success:
+                self.write_to_console("❌ Failed to start kernel build process.\n", color="red")
+                self.set_status("❌ Kernel build failed to start")
+                self.run_button.config(state="normal")
+                self.update_kernel_button_state()
+        except Exception as e:
+            self.write_to_console(f"❌ Error starting kernel build: {e}\n", color="red")
+            self.set_status("❌ Kernel build error")
+            self.run_button.config(state="normal")
+            self.update_kernel_button_state()
+
     def on_run_search(self):
-        """Start or stop the search process"""
+        """Start or stop the search process, or run kernel build if needed"""
         if not hasattr(self, 'search_running'):
             self.search_running = False
             self.start_time = None
+
+        # Check if we need to build kernels first
+        if not self.search_running and self.controller.is_kernel_build_needed():
+            self.run_kernel_build()
+            return
 
         if not self.search_running:
             # Get the current seed value
@@ -1730,6 +1782,11 @@ class MainWindow:
         else:
             self.pt.model.df = pd.DataFrame()
 
-        self.pt.redraw()
-        self._adjust_table_column_widths()
+        try:
+            self.pt.redraw()
+            self._adjust_table_column_widths()
+        except (IndexError, AttributeError) as e:
+            # Handle IndexError when clicking on empty table or AttributeError for missing data
+            # This prevents crashes when the pandastable tries to access non-existent rows
+            pass
         self._search_results_count = len(dataframe) if dataframe is not None else 0

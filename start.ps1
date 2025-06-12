@@ -37,27 +37,44 @@ if (Test-Path "Ouija-ui\requirements.txt") {
     exit 1
 }
 
-# Step 3: Configure C/OpenCL build
-Write-Host "🔨 Configuring C/OpenCL build..." -ForegroundColor Cyan
-if (-Not (Test-Path "Ouija-cli\build")) {
-    New-Item -ItemType Directory -Path "Ouija-cli\build" | Out-Null
-}
-cmake -S Ouija-cli -B Ouija-cli\build -DCMAKE_BUILD_TYPE=Release
-if ($LASTEXITCODE -ne 0) {
-    Write-Error "❌ CMake configuration failed. Ensure CMake is installed and in PATH."
-    exit 1
-}
-Write-Host "✅ CMake configuration complete."
-
-# Step 4: Build the project
-Write-Host "🔧 Building the project..." -ForegroundColor Cyan
-cmake --build Ouija-cli\build --config Release
+# Step 3: Build the C/OpenCL project using the dedicated build script
+Write-Host "🔨 Building C/OpenCL project..." -ForegroundColor Cyan
+& "Ouija-cli\build.ps1"
 if ($LASTEXITCODE -ne 0) {
     Write-Error "❌ Build failed. Check the output for errors."
     exit 1
 }
 Write-Host "✅ Build complete."
 
+# Step 4: Copy Ouija-CLI.exe and lib folder to root directory
+Write-Host "📋 Copying Ouija-CLI.exe and lib folder to root directory..." -ForegroundColor Cyan
+if (Test-Path "Ouija-cli\Ouija-CLI.exe") {
+    Copy-Item "Ouija-cli\Ouija-CLI.exe" "." -Force
+    Write-Host "✅ Ouija-CLI.exe copied to root directory."
+} else {
+    Write-Error "❌ Ouija-CLI.exe not found in Ouija-cli directory."
+    exit 1
+}
+
+if (Test-Path "Ouija-cli\lib") {
+    if (Test-Path "lib") {
+        Remove-Item "lib" -Recurse -Force
+    }
+    Copy-Item "Ouija-cli\lib" "." -Recurse -Force
+    Write-Host "✅ lib folder copied to root directory."
+} else {
+    Write-Error "❌ lib folder not found in Ouija-cli directory."
+    exit 1
+}
+
+# Also copy precompile_kernels.ps1 for kernel recompilation
+if (Test-Path "Ouija-cli\precompile_kernels.ps1") {
+    Copy-Item "Ouija-cli\precompile_kernels.ps1" "." -Force
+    Write-Host "✅ precompile_kernels.ps1 copied to root directory."
+} else {
+    Write-Error "❌ precompile_kernels.ps1 not found in Ouija-cli directory."
+    exit 1
+}
 
 # Step 5: Run the application
 Write-Host "🚀 Running the application..." -ForegroundColor Green
