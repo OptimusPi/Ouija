@@ -5,5 +5,9 @@
 *.pyc
 /Ouija-ui/build
 *.spec
-distribution/Ouija-v0.3.14-Windows/ouija_error.log
+distribution/
 /lib
+ouija_error.log
+*.log
+/.vscode
+/distribution

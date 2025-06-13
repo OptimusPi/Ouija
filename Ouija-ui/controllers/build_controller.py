@@ -109,12 +109,13 @@ class BuildController:
 
                 # Use subprocess.Popen to run the build script and stream output
                 process = subprocess.Popen([
-                    'powershell', '-ExecutionPolicy', 'Bypass', '-File',
+                    'powershell', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File',
                     build_script_path, '-PrecompileKernels'
                 ],
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.STDOUT,
                                            text=True,
+                                           encoding='utf-8',
                                            cwd=working_dir)
 
                 if self.current_view:
