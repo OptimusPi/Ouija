@@ -101,9 +101,7 @@ class SearchModel:
 
             # Add GPU batch size
             if gpu_batch:
-                command_parts.extend(["-b", str(gpu_batch)])
-
-            # Log and execute the command
+                command_parts.extend(["-b", str(gpu_batch)])            # Log and execute the command
             command = " ".join(command_parts)
             if self.console_callback:
                 self.console_callback(f"{command}\n")     
@@ -115,7 +113,8 @@ class SearchModel:
                 text=True,
                 encoding='utf-8',
                 errors='ignore',
-                cwd=os.getcwd()
+                cwd=os.getcwd(),
+                startupinfo=self._get_startup_info()
             )
             self.active_processes.append(process)
             threading.Thread(
@@ -287,6 +286,15 @@ class SearchModel:
             if self.process_finished_callback:
                 self.process_finished_callback()
 
+    def _get_startup_info(self):
+        """Get startup info to hide console windows on Windows"""
+        if os.name == "nt":  # Windows
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+            return startupinfo
+        return None
+
     def stop_all_searches(self):
         """Stop all active search processes"""
         # First try to stop the processes we're tracking
@@ -295,23 +303,28 @@ class SearchModel:
                 if process.poll() is None:  # If process is still running
                     if os.name == "nt":  # Windows
                         subprocess.call(
-                            ["taskkill", "/F", "/T", "/PID", str(process.pid)]
+                            ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                            startupinfo=self._get_startup_info()
                         )
                     else:  # Unix/Linux/Mac
                         os.kill(process.pid, signal.SIGKILL)
             except Exception as e:
-                print(f"Error stopping process: {e}")        # Also look for any Ouija-CLI.exe processes that might have been left behind
+                print(f"Error stopping process: {e}")
+        
+        # Also look for any Ouija-CLI.exe processes that might have been left behind
         try:
             if os.name == "nt":  # Windows
                 # Kill any remaining Ouija-CLI.exe processes
                 subprocess.call(
-                    ["taskkill", "/F", "/IM", "Ouija-CLI.exe"], stderr=subprocess.DEVNULL
+                    ["taskkill", "/F", "/IM", "Ouija-CLI.exe"], 
+                    stderr=subprocess.DEVNULL,
+                    startupinfo=self._get_startup_info()
                 )
             else:  # Unix/Linux/Mac
                 # Find and kill any Ouija processes
                 subprocess.call(["pkill", "-f", "Ouija-CLI.exe"], stderr=subprocess.DEVNULL)
         except Exception as e:
-            print(f"Error cleaning up Ouija-CLI processes: {e}")
+                print(f"Error cleaning up Ouija-CLI processes: {e}")
 
         # Clear the list
         self.active_processes.clear()

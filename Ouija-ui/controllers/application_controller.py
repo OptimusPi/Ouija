@@ -140,14 +140,9 @@ class ApplicationController:
         search_result = self.search_controller.stop_search()
         fun_result = self.fun_search_controller.stop_fun_search()
         return search_result.success or fun_result.success
-
-    def run_prank_seed_search(self):
-        """Run a prank seed search (NSFW category)"""
-        result = self.fun_search_controller.run_prank_seed_search()
-        return result.success
-
+    
     def run_fun_seed_search(self, category):
-        """Run a fun seed search for a specific category"""
+        """Run a fun seed search for the given category (delegated to FunSearchController)"""
         result = self.fun_search_controller.run_fun_seed_search(category)
         return result.success
 

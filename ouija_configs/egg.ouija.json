@@ -21,7 +21,7 @@
         "maxSearchAnte": 8,
         "deck": "Red_Deck",
         "stake": "White_Stake",
-        "scoreNaturalNegatives": false,
-        "scoreDesiredNegatives": false
+        "scoreNaturalNegatives": true,
+        "scoreDesiredNegatives": true
     }
 }

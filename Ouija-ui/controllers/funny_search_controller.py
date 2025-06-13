@@ -12,27 +12,18 @@ class FunSearchController:
         self.search_model = search_model
         self.config_controller = config_controller
         self.database_controller = database_controller
-        self.current_view = None
-
-        # Fun search state
+        self.current_view = None        # Fun search state
         self.fun_search_active = False
         self.fun_search_category = None
         self.fun_search_words = []
         self.fun_search_current_word_index = 0
         self.auto_refresh_timer_id = None
         self.auto_refresh_interval_ms = 2000
+        self.completion_message_shown = False  # Flag to prevent duplicate "Search Complete" messages
 
     def register_view(self, view):
         """Register the main view for callbacks"""
         self.current_view = view
-
-    def run_prank_seed_search(self):
-        """Run a prank seed search (NSFW category)
-        
-        Returns:
-            Result: Success/failure with error details
-        """
-        return self.run_fun_seed_search("NSFW")
 
     def run_fun_seed_search(self, category):
         """Run a fun seed search for a specific category
@@ -61,14 +52,16 @@ class FunSearchController:
 
             if self.search_model.has_active_searches() or self.fun_search_active:
                 return Result.error("A search is already running. Please stop it first.")
-
+            
             # Generate all valid seeds for each word with padding
             fun_seeds = self._generate_fun_seeds(fun_words[category])
 
+            # Reset completion state for new search
             self.fun_search_category = category
             self.fun_search_words = fun_seeds
             self.fun_search_current_word_index = 0
             self.fun_search_active = True
+            self.completion_message_shown = False
 
             if self.current_view:
                 self.current_view.write_to_console(f"🎭 Starting {category} fun seed search!\n", color="white")
@@ -125,19 +118,30 @@ class FunSearchController:
             n_value = 35 ** right_pad_count if right_pad_count > 0 else 35
 
             if self.current_view:
-                self.current_view.write_to_console(f"    🔍 Searching: {search_term} (n={n_value})\n", color="blue")
-
-            config_path = self.config_controller.config_model.get_command_config_path()
-            if not config_path:
+                self.current_view.write_to_console(f"    🔍 Searching: {search_term} (n={n_value})\n", color="blue")            
+                # Get config name instead of path (CLI now uses config name only)
+            config_name = self.config_controller.config_model.config_name
+            if not config_name:
+                # Try to get it from the loaded path if config_name is empty
+                loaded_path = self.config_controller.config_model.loaded_config_path
+                if loaded_path:
+                    import os
+                    config_name = os.path.basename(loaded_path).replace(".ouija.json", "")
+            
+            if not config_name:
                 return False
 
-            self.database_controller.database_model.connect(config_path)
-
+            # Connect to database using full path (for database file naming)
+            db_config_path = self.config_controller.config_model.get_absolute_config_path()
+            if not db_config_path:
+                import os
+                db_config_path = os.path.join(self.config_controller.config_model.CONFIG_DIR, f"{config_name}.ouija.json")
+                self.database_controller.database_model.connect(db_config_path)
             success = self.search_model.start_search(
-                config_path=config_path,
+                config_name_for_cli=config_name,
                 starting_seed=search_term,
                 thread_groups=self.config_controller.get_setting("thread_groups"),
-                number_of_seeds=n_value,
+                number_of_seeds=str(n_value),  # Convert integer to string
                 db_model=self.database_controller.database_model,
                 cutoff=self.config_controller.get_setting("cutoff"),
                 gpu_batch=self.config_controller.get_setting("gpu_batch"),
@@ -165,7 +169,8 @@ class FunSearchController:
                     word = self.fun_search_words[self.fun_search_current_word_index][0]  # Get seed from tuple
                     if self.current_view and word:
                         self.current_view.write_to_console(f"✅ Completed: {word}\n", color="green")
-                        self.current_view.refresh_results_table()
+                        # Refresh results table through database controller
+                        self.database_controller.refresh_results()
 
             # Advance to next search
             self.fun_search_current_word_index += 1
@@ -179,8 +184,12 @@ class FunSearchController:
                 self._stop_auto_refresh()
 
                 if self.current_view:
-                    self.current_view.write_to_console(f"🎉 All {category} searches complete! Check your results! 🎉\n", color="green")
-                    self.current_view.set_search_running(False)
+                    try:
+                        self.current_view.write_to_console(f"🎉 All {category} searches complete! Check your results! 🎉\n", color="green")
+                        self.current_view.set_search_running(False)
+                    except Exception:
+                        # UI might be destroyed during cleanup, ignore errors
+                        pass
 
                 self.database_controller.refresh_results()
                 return False
@@ -190,14 +199,22 @@ class FunSearchController:
 
         except Exception as e:
             if self.current_view:
-                self.current_view.write_to_console(f"⚠️ Error in fun search completion: {e}\n", color="red")
+                try:
+                    self.current_view.write_to_console(f"⚠️ Error in fun search completion: {e}\n", color="red")
+                except Exception:
+                    # UI might be destroyed, ignore errors
+                    pass
             print(f"Error in handle_search_completed: {e}")
 
             # Reset fun search state to prevent further issues
             self.fun_search_active = False
             self.fun_search_category = None
             if self.current_view:
-                self.current_view.set_search_running(False)
+                try:
+                    self.current_view.set_search_running(False)
+                except Exception:
+                    # UI might be destroyed during cleanup, ignore errors
+                    pass
             return False
 
     def stop_fun_search(self):
@@ -206,6 +223,10 @@ class FunSearchController:
         Returns:
             Result: Success result
         """
+        # Just brutally kill the CLI processes - screw the fancy UI updates during cleanup!
+        self.search_model.stop_all_searches()
+        
+        # Reset fun search state
         self.fun_search_active = False
         self.fun_search_category = None
         self.fun_search_words = []
@@ -225,10 +246,31 @@ class FunSearchController:
     def _stop_auto_refresh(self):
         """Stop the auto-refresh timer"""
         if self.auto_refresh_timer_id and self.current_view:
-            self.current_view.root.after_cancel(self.auto_refresh_timer_id)
+            try:
+                self.current_view.root.after_cancel(self.auto_refresh_timer_id)
+            except:
+                pass  # Don't care if UI is dead
             self.auto_refresh_timer_id = None
 
     def cleanup(self):
-        """Clean up fun search resources"""
-        self.stop_fun_search()
-        self._stop_auto_refresh()
+        """Clean up fun search resources - just kill everything!"""
+        # Brutally stop all searches without UI updates
+        try:
+            self.search_model.stop_all_searches()
+        except:
+            pass  # Don't care about errors during shutdown
+            
+        # Reset state
+        self.fun_search_active = False
+        self.fun_search_category = None
+        self.fun_search_words = []
+        self.fun_search_current_word_index = 0
+        
+        # Kill timers
+        if self.auto_refresh_timer_id:
+            try:
+                if self.current_view and hasattr(self.current_view, 'root'):
+                    self.current_view.root.after_cancel(self.auto_refresh_timer_id)
+            except:
+                pass  # UI is probably dead anyway
+            self.auto_refresh_timer_id = None

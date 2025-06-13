@@ -20,18 +20,13 @@ class SearchController:
         self.auto_refresh_timer_id = None
         self.update_debounce_ms = 500
         self.auto_refresh_interval_ms = 2000
-
+        
         # Search state
         self.pending_results = None
         self.pending_headers = None
+        self.search_completed = False  # Flag to prevent duplicate completion messages
 
-        # Set up callbacks for the search model
-        self.search_model.set_callbacks(
-            results_callback=self._on_search_results,
-            console_callback=self._on_console_output,
-            process_finished_callback=self._on_search_completed,
-        )
-
+        # Note: Callbacks are set up by ApplicationController to coordinate with FunSearchController
     def register_view(self, view):
         """Register the main view for callbacks"""
         self.current_view = view
@@ -44,6 +39,9 @@ class SearchController:
         """
         if self.search_model.has_active_searches():
             return self.stop_search()
+
+        # Reset completion flag for new search
+        self.search_completed = False
 
         # Use the config name instead of a full path
         config_name = self.config_controller.config_model.config_name
@@ -190,17 +188,22 @@ class SearchController:
             parts = status_message.split(":clock:")
             if len(parts) == 2:
                 self.current_view.set_status(parts[0].strip())
-                
                 self.current_view.set_metrics(f"⏱️{parts[1].strip()}")
             else:
                 self.current_view.set_status(status_message)
-        else:
-            # No clock emoji found, set as regular status
-            self.current_view.set_status(status_message)
 
     def _on_search_completed(self):
         """Callback for when a search process completes"""
         try:
+            # Prevent duplicate completion messages
+            if hasattr(self, 'search_completed') and self.search_completed:
+                return
+            
+            if not hasattr(self, 'search_completed'):
+                self.search_completed = False
+                
+            self.search_completed = True
+            
             self.database_controller.refresh_results()
             if self.current_view:
                 self.current_view.write_to_console("--- Search Complete ---\n", color="white")

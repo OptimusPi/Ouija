@@ -286,8 +286,10 @@ class ConfigWidget:
         # Access settings directly from the controller's config_model
         config_model = self.controller.config_model
         
-        # Update config name
-        self.config_name_var.set(getattr(config_model, 'config_name', ''))
+        # Update config name - add debug print
+        config_name = getattr(config_model, 'config_name', '')
+        print(f"DEBUG: update_display() - config_name from model: '{config_name}'")
+        self.config_name_var.set(config_name)
         
         # Update dropdowns
         self.deck_var.set(getattr(config_model, 'deck', ''))

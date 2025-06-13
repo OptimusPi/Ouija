@@ -64,8 +64,13 @@ class BuildController:
                 self.current_view.write_to_console(
                     "[Info] Kernel build already running.\n", color="white")
             return Result.error("Kernel build already running")
-
+        
         self.build_running = True
+        
+        # Update status and button state immediately when build starts
+        if self.current_view:
+            self.current_view.set_status("Building kernels...")
+            self.current_view.run_settings_widget.update_kernel_button_state(False)
 
         def build_done():
             self.build_running = False
@@ -73,8 +78,8 @@ class BuildController:
                 on_complete()
             if self.current_view:
                 self.current_view.set_status("Kernel build finished.")
-                # Update button state after build completes
-                self.current_view.update_kernel_button_state(False)
+                # Update button state after build completes - go directly to the widget
+                self.current_view.run_settings_widget.update_kernel_button_state(False)
 
         try:
             self._run_build_script(on_complete=build_done)
@@ -88,49 +93,35 @@ class BuildController:
         
         Args:
             on_complete (callable, optional): Callback when build completes
-        """        
+        """          
         def run_and_stream():
             try:
-                current_build_script = 'precompile_kernels.ps1'
-
-                build_script_path = None
-                working_dir = None
-
-                if os.path.exists(current_build_script):
-                    # Installed environment - build script in current directory
-                    build_script_path = current_build_script
-                    working_dir = os.getcwd()
-                else:
-                    error_msg = f"No build.ps1 script found.\n"
-                    raise FileNotFoundError(error_msg)
-
                 if self.current_view:
                     self.current_view.write_to_console(
-                        f"\n⚙️ Running kernel build from: {working_dir}\n",
-                        color="white")                # Use subprocess.Popen to run the build script and stream output
+                        "\n⚙️ Running kernel build...\n", color="white")                # Find the precompile_kernels.ps1 script
+                script_path = self._get_precompile_script_path()
+                
+                # Just run the local script directly
                 process = subprocess.Popen([
                     'powershell.exe', '-NoProfile', '-WindowStyle', 'Hidden', '-NonInteractive', 
-                    '-ExecutionPolicy', 'Bypass', '-File', build_script_path, '-PrecompileKernels'
-                ],
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.STDOUT,
-                                           text=True,
-                                           encoding='utf-8',
-                                           cwd=working_dir,
-                                           creationflags=subprocess.CREATE_NO_WINDOW,
-                                           startupinfo=self._get_startup_info())
-
+                    '-ExecutionPolicy', 'Bypass', '-File', script_path, '-PrecompileKernels'
+                ], stdout=subprocess.PIPE,
+                   stderr=subprocess.STDOUT,
+                   text=True,
+                   encoding='utf-8',
+                   creationflags=subprocess.CREATE_NO_WINDOW,
+                   startupinfo=self._get_startup_info())
+                
                 if self.current_view:
                     self.current_view.write_to_console(
-                        "\n⚙️ Running kernel build...\n", color="white")
+                        "\n⚙️ Please Wait...This takes a long time but only needs to run once!\n", color="white")
 
                 for line in process.stdout:
                     if self.current_view:
-                        # Ensure each output ends with a newline
+                        # Ensure each output ends with a newline for proper display
                         if not line.endswith('\n'):
                             line += '\n'
-                            self.current_view.write_to_console(line,
-                                                               color="blue")
+                        self.current_view.write_to_console(line, color="blue")
 
                 process.wait()
 
@@ -152,9 +143,7 @@ class BuildController:
                     self.current_view.write_to_console(
                         f"[Error] Kernel build crashed: {e}\n", color="red")
                 if on_complete:
-                    on_complete()
-
-        # Run in a thread so the UI doesn't freeze
+                    on_complete()        # Run in a thread so the UI doesn't freeze
         threading.Thread(target=run_and_stream, daemon=True).start()
 
     def _get_startup_info(self):
@@ -165,6 +154,28 @@ class BuildController:
             startupinfo.wShowWindow = subprocess.SW_HIDE
             return startupinfo
         return None
+
+    def _get_precompile_script_path(self):
+        """Find the precompile_kernels.ps1 script path"""
+        # Try different possible locations
+        possible_paths = [
+            "precompile_kernels.ps1",  # Current working directory (installed location)
+            "./precompile_kernels.ps1",  # Same directory  
+            "../precompile_kernels.ps1",  # Parent directory (development)
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                return os.path.abspath(path)
+        
+        # If not found, raise an error with helpful info
+        cwd = os.getcwd()
+        raise FileNotFoundError(
+            f"precompile_kernels.ps1 not found. Searched:\n"
+            f"Current working directory: {cwd}\n" +
+            "\n".join(f"  - {path} ({'EXISTS' if os.path.exists(path) else 'NOT FOUND'})" 
+                     for path in possible_paths)
+        )
 
     def _mark_installation_success(self):
         """Mark installation success in user.ouija.conf"""
