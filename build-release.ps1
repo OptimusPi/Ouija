@@ -3,7 +3,10 @@
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🔨 Ouija Complete Build Script v0.3.14" -ForegroundColor Cyan
+# Read version from version.ouija.txt
+$Version = Get-Content "$PSScriptRoot\version.ouija.txt" | Select-Object -First 1
+
+Write-Host "🔨 Ouija Complete Build Script v$Version" -ForegroundColor Cyan
 Write-Host "=======================================" -ForegroundColor Cyan
 
 $RootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -84,7 +87,7 @@ Write-Host "✅ .bin files removed from ouija_filters" -ForegroundColor Green
 # Create final distribution package
 Write-Host "📦 Creating distribution package..." -ForegroundColor Yellow
 
-$PackageDir = Join-Path $DistDir "Ouija-v0.3.14-Windows"
+$PackageDir = Join-Path $DistDir "Ouija-v$Version-Windows"
 New-Item -ItemType Directory -Path $PackageDir -Force | Out-Null
 
 # Copy CLI components
@@ -186,7 +189,7 @@ if (Test-Path $ReadmePath) {
 }
 
 # Create ZIP archive for distribution
-$ZipPath = Join-Path $DistDir "Ouija-v0.3.14-Windows.zip"
+$ZipPath = Join-Path $DistDir "Ouija-v$Version-Windows.zip"
 if (Test-Path $ZipPath) { Remove-Item $ZipPath -Force }
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -202,7 +205,7 @@ Write-Host ""
 Write-Host "📦 Package Details:" -ForegroundColor Cyan
 Write-Host "   Directory: $PackageDir" -ForegroundColor White
 Write-Host "   ZIP File:  $ZipPath" -ForegroundColor White
-Write-Host "   Version:   0.3.14" -ForegroundColor White
+Write-Host "   Version:   $Version" -ForegroundColor White
 
 # Calculate package size
 $packageSize = (Get-ChildItem $PackageDir -Recurse | Measure-Object -Property Length -Sum).Sum

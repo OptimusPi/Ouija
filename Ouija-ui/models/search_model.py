@@ -121,15 +121,16 @@ class SearchModel:
             threading.Thread(
                 target=self._read_process_output, args=(process, db_model), daemon=True
             ).start()
-            return True
+            return True        
         except Exception as e:
             if self.console_callback:
                 self.console_callback(f"Error starting search: {str(e)}\n")
             return False
-
+      
     def _get_cli_path(self):
         """Retrieve the path to the Ouija-CLI executable"""
-        cli_path = os.path.join(os.getcwd(), "Ouija-CLI.exe")
+        cli_path = "./Ouija-CLI.exe"
+        
         if not os.path.exists(cli_path):
             raise FileNotFoundError(f"Ouija-CLI executable not found at {cli_path}")
         return cli_path

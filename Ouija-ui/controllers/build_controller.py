@@ -27,8 +27,7 @@ class BuildController:
         Returns:
             bool: True if build is needed
         """
-        # Check user.ouija.conf for installation_success
-        conf_path = os.path.join(os.getcwd(), 'user.ouija.conf')
+        conf_path = 'user.ouija.conf'
         try:
             if os.path.exists(conf_path):
                 with open(conf_path, 'r') as f:
@@ -36,9 +35,10 @@ class BuildController:
                 if conf.get('installation_success'):
                     return False
         except Exception:
-            pass        # Check for Ouija-CLI.exe and at least one .bin kernel file
-        exe_path = os.path.join(os.getcwd(), 'Ouija-CLI.exe')
-        kernels_dir = os.path.join(os.getcwd(), 'ouija_filters')
+            pass        
+        # Check for Ouija-CLI.exe and at least one .bin kernel file
+        exe_path = "./Ouija-CLI.exe"
+        kernels_dir = "./ouija_filters"
         has_exe = os.path.exists(exe_path)
         has_bin = False
 
@@ -73,6 +73,8 @@ class BuildController:
                 on_complete()
             if self.current_view:
                 self.current_view.set_status("Kernel build finished.")
+                # Update button state after build completes
+                self.current_view.update_kernel_button_state(False)
 
         try:
             self._run_build_script(on_complete=build_done)
@@ -105,18 +107,18 @@ class BuildController:
                 if self.current_view:
                     self.current_view.write_to_console(
                         f"\n⚙️ Running kernel build from: {working_dir}\n",
-                        color="white")
-
-                # Use subprocess.Popen to run the build script and stream output
+                        color="white")                # Use subprocess.Popen to run the build script and stream output
                 process = subprocess.Popen([
-                    'powershell', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File',
-                    build_script_path, '-PrecompileKernels'
+                    'powershell.exe', '-NoProfile', '-WindowStyle', 'Hidden', '-NonInteractive', 
+                    '-ExecutionPolicy', 'Bypass', '-File', build_script_path, '-PrecompileKernels'
                 ],
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.STDOUT,
                                            text=True,
                                            encoding='utf-8',
-                                           cwd=working_dir)
+                                           cwd=working_dir,
+                                           creationflags=subprocess.CREATE_NO_WINDOW,
+                                           startupinfo=self._get_startup_info())
 
                 if self.current_view:
                     self.current_view.write_to_console(
@@ -154,6 +156,15 @@ class BuildController:
 
         # Run in a thread so the UI doesn't freeze
         threading.Thread(target=run_and_stream, daemon=True).start()
+
+    def _get_startup_info(self):
+        """Get startup info to hide console windows on Windows"""
+        if os.name == "nt":  # Windows
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+            return startupinfo
+        return None
 
     def _mark_installation_success(self):
         """Mark installation success in user.ouija.conf"""

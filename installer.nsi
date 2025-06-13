@@ -2,7 +2,7 @@
 # Requires NSIS (Nullsoft Scriptable Install System) to be installed
 
 !define APP_NAME "Ouija"
-!define APP_VERSION "0.3.14"
+
 !define APP_PUBLISHER "OptimusPi (pifreak loves you!)"
 !define APP_URL "https://github.com/OptimusPi/ouija"
 !define APP_SUPPORT_URL "https://github.com/OptimusPi/ouija/issues"
@@ -51,10 +51,10 @@ RequestExecutionLevel admin
 # Version info
 VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
-VIAddVersionKey "ProductVersion" "${APP_VERSION}"
+VIAddVersionKey "ProductVersion" "${APP_VERSION}.0"
 VIAddVersionKey "CompanyName" "${APP_PUBLISHER}"
-VIAddVersionKey "FileDescription" "Balatro Seed Finder"
-VIAddVersionKey "FileVersion" "${APP_VERSION}"
+VIAddVersionKey "FileDescription" "Ouija - Balatro Seed Finder"
+VIAddVersionKey "FileVersion" "${APP_VERSION}.0"
 VIAddVersionKey "LegalCopyright" "© 2025 ${APP_PUBLISHER}"
 
 # Installer sections
@@ -150,32 +150,8 @@ Function .onInstSuccess
     ${If} $0 != 0
         MessageBox MB_OK|MB_ICONINFORMATION "Installation complete!$\n$\nNote: OpenCL GPU support was not detected. You may need to update your graphics drivers for optimal performance."
     ${Else}
-        # Offer to precompile OpenCL kernels
-        MessageBox MB_YESNO|MB_ICONQUESTION "GPU support detected! Would you like to precompile OpenCL kernels now for faster startup? This may take a minute but will improve first-run performance." IDNO skipPrecompilation
-            DetailPrint "Precompiling OpenCL kernels..."
-            SetDetailsPrint both
-            ExecWait '"$INSTDIR\Ouija-CLI.exe" -n 0' $1
-            # Precompile all filter templates
-            FindFirst $2 $3 "$INSTDIR\ouija_filters\ouija_*.cl"
-            loop:
-                StrCmp $3 "" done
-                ${If} $3 != ""
-                    # Extract template name without extension and path
-                    StrCpy $4 $3 -3 # Remove .cl extension
-                    DetailPrint "Precompiling filter: $4"
-                    ExecWait '"$INSTDIR\Ouija-CLI.exe" -f $4 -n 0' $1
-                ${EndIf}
-                FindNext $2 $3
-                Goto loop
-            done:
-            FindClose $2
-            SetDetailsPrint none
-            MessageBox MB_OK|MB_ICONINFORMATION "Installation complete!$\n$\nGPU support detected and kernels precompiled. ${APP_NAME} is ready to use."
-            Goto endFunction
-        skipPrecompilation:
-            MessageBox MB_OK|MB_ICONINFORMATION "Installation complete!$\n$\nGPU support detected. ${APP_NAME} is ready to use."
+        MessageBox MB_OK|MB_ICONINFORMATION "Installation complete!$\n$\nGPU support detected. ${APP_NAME} is ready to use.$\n$\nKernels will be compiled automatically when needed."
     ${EndIf}
-    endFunction:
 FunctionEnd
 
 # Function RunAdvancedPrecompile has been replaced by RunKernelPrecompilation
@@ -208,6 +184,30 @@ Section "Uninstall"    # Remove files
     # Remove installation directory
     RMDir "$INSTDIR"
 SectionEnd
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

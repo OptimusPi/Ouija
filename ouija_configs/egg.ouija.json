@@ -4,7 +4,7 @@
     "author": "Ouija GUI User",
     "filter_config": {
         "numNeeds": 1,
-        "numWants": 2,
+        "numWants": 1,
         "Needs": [
             {
                 "value": "Egg",
@@ -16,10 +16,6 @@
             {
                 "value": "Egg",
                 "jokeredition": "No_Edition"
-            },
-            {
-                "value": "Certificate",
-                "jokeredition": "Negative"
             }
         ],
         "maxSearchAnte": 8,

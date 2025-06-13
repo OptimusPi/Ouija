@@ -10,6 +10,9 @@ $BuildDir = Join-Path $ScriptDir "build"
 $OuijaExecutablePath = Join-Path $BuildDir "Release\\Ouija-CLI.exe" # Changed to Ouija-CLI.exe
 $FiltersDir = Join-Path $ScriptDir "ouija_filters"
 
+# Read version from version.ouija.txt
+$Version = Get-Content "$PSScriptRoot\..\version.ouija.txt" | Select-Object -First 1
+
 Write-Host "Build script started..."
 Write-Host "Workspace Root: $ScriptDir"
 Write-Host "Build Directory: $BuildDir"
@@ -27,8 +30,8 @@ if ($Clean) {
     }
     Write-Host ""
 
-    # Clean ouija_search.bin from project root
-    $mainKernelBin = Join-Path $ScriptDir "ouija_search.bin"
+    # Clean ouija_search.bin from lib folder
+    $mainKernelBin = Join-Path $ScriptDir "lib\ouija_search.bin"
     if (Test-Path $mainKernelBin) {
         Write-Host "Removing main kernel binary: $mainKernelBin"
         Remove-Item -Force $mainKernelBin
@@ -224,3 +227,14 @@ try {
 
 Write-Host "✅ Build script finished."
 Write-Host ""
+
+# Example for MSVC (cl.exe):
+# $compileFlags = "/D OUIJA_VERSION=\"$Version\" ...other flags..."
+# cl.exe $compileFlags ...
+
+# Example for GCC/Clang:
+# $compileFlags = "-DOUIJA_VERSION=\"$Version\" ...other flags..."
+# gcc $compileFlags ...
+
+# If using CMake, add -DOUIJA_VERSION=\"$Version\" to CMAKE_C_FLAGS or as a -D argument:
+# cmake -DOUIJA_VERSION=$Version ...

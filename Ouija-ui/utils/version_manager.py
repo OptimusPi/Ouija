@@ -57,10 +57,10 @@ class VersionManager:
                     self._version = f.read().strip()
             else:
                 # Fallback version if file doesn't exist
-                self._version = "0.3.14"
+                self._version = "unknown"
         except Exception:
             # Fallback version if there's an error reading the file
-            self._version = "0.3.14"
+            self._version = "unknown"
 
 
 # Global instance

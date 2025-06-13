@@ -10,6 +10,15 @@ $BuildDir = Join-Path $ScriptDir "build"
 $OuijaExecutablePath = Join-Path $BuildDir "Release\\Ouija-CLI.exe" # Changed to Ouija-CLI.exe
 $FiltersDir = Join-Path $ScriptDir "ouija_filters"
 
+# Load version from version.ouija.txt
+$VersionFile = Join-Path $ScriptDir "version.ouija.txt"
+if (-not (Test-Path $VersionFile)) {
+    Write-Host "ERROR: version.ouija.txt not found at $VersionFile" -ForegroundColor Red
+    exit 1
+}
+$Version = Get-Content $VersionFile | Select-Object -First 1
+Write-Host "Loaded version: $Version"
+
 Write-Host "Build script started..."
 Write-Host "Workspace Root: $ScriptDir"
 Write-Host "Build Directory: $BuildDir"
@@ -27,8 +36,8 @@ if ($Clean) {
     }
     Write-Host ""
 
-    # Clean ouija_search.bin from project root
-    $mainKernelBin = Join-Path $ScriptDir "ouija_search.bin"
+    # Clean ouija_search.bin from lib folder
+    $mainKernelBin = Join-Path $ScriptDir "lib\ouija_search.bin"
     if (Test-Path $mainKernelBin) {
         Write-Host "Removing main kernel binary: $mainKernelBin"
         Remove-Item -Force $mainKernelBin

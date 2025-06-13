@@ -7,7 +7,7 @@
 *.spec
 distribution/
 /lib
-ouija_error.log
-*.log
 /.vscode
 /distribution
+*.log
+ouija_error.log

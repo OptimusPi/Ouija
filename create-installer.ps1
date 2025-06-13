@@ -1,11 +1,13 @@
+param(
+    [switch]$InstallNSIS,
+    [switch]$CreateInstaller
+)
+
 # Modern Installer Creation Script for Ouija
 # This script installs NSIS and creates a professional Windows installer
 
-param(
-    [switch]$InstallNSIS,
-    [switch]$CreateInstaller,
-    [string]$Version = "0.3.14"
-)
+# Read version from version.ouija.txt
+$Version = Get-Content "$PSScriptRoot\version.ouija.txt" | Select-Object -First 1
 
 $ErrorActionPreference = "Stop"
 
@@ -110,7 +112,7 @@ function New-Installer {
     Set-Content "installer.nsi" $nsisContent
       # Compile the installer
     try {
-        $nsisOutput = & makensis installer.nsi 2>&1
+        $nsisOutput = & makensis /DAPP_VERSION="$Version" installer.nsi 2>&1
         $nsisExitCode = $LASTEXITCODE
         
         if ($nsisExitCode -ne 0) {

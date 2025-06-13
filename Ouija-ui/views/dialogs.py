@@ -55,11 +55,11 @@ class ItemSelectorDialog(tk.Toplevel):
             bg=BACKGROUND,
             fg="white",
         )
-        category_label.pack(fill="x", padx=10, pady=10)
+        category_label.pack(fill="x", padx=10, pady=4)
 
         # Search field
         self.search_frame = tk.Frame(self.main_frame, bg=BACKGROUND)
-        self.search_frame.pack(fill="x", padx=10, pady=10)
+        self.search_frame.pack(fill="x", padx=10, pady=4)
 
         tk.Label(self.search_frame, text="Search:", bg=BACKGROUND, fg="white").pack(
             side="left", padx=10
@@ -73,10 +73,10 @@ class ItemSelectorDialog(tk.Toplevel):
         self.items_frame = tk.LabelFrame(
             self.main_frame, text="Items", bg=BACKGROUND, fg="white"
         )
-        self.items_frame.pack(fill="x", expand=True, padx=10, pady=10)
+        self.items_frame.pack(fill="x", expand=True, padx=10, pady=4)
 
         self.listbox_frame = tk.Frame(self.items_frame, bg=BACKGROUND)
-        self.listbox_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        self.listbox_frame.pack(fill="both", expand=True, padx=10, pady=4)
 
         self.item_scrollbar = tk.Scrollbar(self.listbox_frame)
         self.item_scrollbar.pack(side="right", fill="y")
@@ -99,14 +99,14 @@ class ItemSelectorDialog(tk.Toplevel):
             self.need_want_frame = tk.LabelFrame(
                 self.main_frame, text="Desire Type", bg=BACKGROUND, fg="white"
             )
-            self.need_want_frame.pack(side=tk.LEFT, fill="y", padx=5, pady=5)
+            self.need_want_frame.pack(side=tk.LEFT, fill="y", padx=4, pady=4)
 
             self.is_need_for_rank_suit_var = tk.BooleanVar(
                 value=self.is_need
             )  # Default from initial context
 
             need_want_container = tk.Frame(self.need_want_frame, bg=BACKGROUND)
-            need_want_container.pack(fill="x", padx=5, pady=5)
+            need_want_container.pack(fill="x", padx=4, pady=4)
 
             rb_need = ttk.Radiobutton(
                 need_want_container,
@@ -114,7 +114,7 @@ class ItemSelectorDialog(tk.Toplevel):
                 variable=self.is_need_for_rank_suit_var,
                 value=True,
             )
-            rb_need.grid(row=0, column=0, padx=5, pady=2, sticky="w")
+            rb_need.grid(row=0, column=0, padx=4, pady=4, sticky="w")
 
             rb_want = ttk.Radiobutton(
                 need_want_container,
@@ -122,17 +122,17 @@ class ItemSelectorDialog(tk.Toplevel):
                 variable=self.is_need_for_rank_suit_var,
                 value=False,
             )
-            rb_want.grid(row=1, column=0, padx=5, pady=2, sticky="w")
+            rb_want.grid(row=1, column=0, padx=4, pady=4, sticky="w")
 
         elif self.is_need:  # Only show ante for non-Rank/Suit if context is 'Need'
             self.ante_frame = tk.LabelFrame(
                 self.main_frame, text="Required by Ante", bg=BACKGROUND, fg="white"
             )
-            self.ante_frame.pack(side=tk.LEFT, fill="y", padx=5, pady=5)
+            self.ante_frame.pack(side=tk.LEFT, fill="y", padx=4, pady=4)
 
             self.ante_var = tk.IntVar(value=1)  # Default to Ante 1 for needs
             ante_container = tk.Frame(self.ante_frame, bg=BACKGROUND)
-            ante_container.pack(side=tk.LEFT, fill="y", padx=5, pady=5)
+            ante_container.pack(side=tk.LEFT, fill="y", padx=4, pady=4)
 
             # Create four rows of ante buttons with clearer spacing
             for ante in range(1, 9):
@@ -145,8 +145,8 @@ class ItemSelectorDialog(tk.Toplevel):
                 rb.grid(
                     row=(ante - 1) % 4,
                     column=(ante - 1) // 4,
-                    padx=5,
-                    pady=2,
+                    padx=4,
+                    pady=4,
                     sticky="w",
                 )
             nah = ttk.Radiobutton(
@@ -155,19 +155,19 @@ class ItemSelectorDialog(tk.Toplevel):
                 variable=self.ante_var,
                 value=0,
             )
-            nah.grid(row=5, column=0, columnspan=2, padx=5, pady=2, sticky="w")
+            nah.grid(row=5, column=0, columnspan=2, padx=4, pady=4, sticky="w")
 
         # Edition frame for jokers (better organized)
         if category == "Jokers":  # Only show edition options for Jokers
             self.edition_frame = tk.LabelFrame(
                 self.main_frame, text="Edition", bg=BACKGROUND, fg="white"
             )
-            self.edition_frame.pack(side=tk.LEFT, fill="y", padx=5, pady=5)
+            self.edition_frame.pack(side=tk.LEFT, fill="y", padx=4, pady=4)
 
             self.edition_var = tk.StringVar(value="No_Edition")
 
             edition_container = tk.Frame(self.edition_frame, bg=BACKGROUND)
-            edition_container.pack(fill="x", padx=5, pady=5)
+            edition_container.pack(fill="x", padx=4, pady=4)
 
             for i, edition in enumerate(JOKER_EDITIONS):
                 rb = ttk.Radiobutton(
@@ -176,10 +176,10 @@ class ItemSelectorDialog(tk.Toplevel):
                     variable=self.edition_var,
                     value=edition,
                 )
-                rb.grid(row=i, column=0, padx=5, pady=2, sticky="w")
+                rb.grid(row=i, column=0, padx=4, pady=4, sticky="w")
         # Buttons
         self.button_frame = tk.Frame(self.main_frame, bg=BACKGROUND)
-        self.button_frame.pack(side=tk.BOTTOM, fill="x", padx=10, pady=10)
+        self.button_frame.pack(side=tk.BOTTOM, fill="x", padx=10, pady=4)
 
         self.select_button = tk.Button(
             self.button_frame,
@@ -190,7 +190,7 @@ class ItemSelectorDialog(tk.Toplevel):
             bg=BLUE,
             fg="white",
         )
-        self.select_button.pack(side="right", padx=25, pady=10)
+        self.select_button.pack(side="right", padx=45, pady=4)
 
         self.cancel_button = tk.Button(
             self.button_frame,
@@ -201,7 +201,7 @@ class ItemSelectorDialog(tk.Toplevel):
             bg=RED,
             fg="white",
         )
-        self.cancel_button.pack(side="left", padx=25, pady=10)
+        self.cancel_button.pack(side="left", padx=45, pady=4)
         # Initialize items list with the pre-selected category
         self.update_items_list()
 

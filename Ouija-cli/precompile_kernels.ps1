@@ -11,8 +11,14 @@ if (-not (Test-Path $OuijaExe)) {
     exit 1
 }
 
+$overallSuccess = $true
+
 Write-Host "Precompiling main kernel..."
 & $OuijaExe -n 0
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Main kernel precompilation failed."
+    $overallSuccess = $false
+}
 
 Write-Host "Precompiling filter kernels..."
 $filters = Get-ChildItem -Path $FiltersDir -Filter "ouija_*.cl"
@@ -20,6 +26,16 @@ foreach ($filter in $filters) {
     $name = $filter.BaseName
     Write-Host "Precompiling $name"
     & $OuijaExe -f $name -n 0
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Precompilation failed for $name."
+        $overallSuccess = $false
+    }
 }
 
-Write-Host "All kernels precompiled!"
+if ($overallSuccess) {
+    Write-Host "All kernels precompiled!"
+    exit 0
+} else {
+    Write-Error "One or more kernels failed to precompile."
+    exit 1
+}
