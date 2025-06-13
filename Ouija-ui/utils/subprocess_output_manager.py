@@ -56,6 +56,7 @@ class SubprocessOutputManager:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding='utf-8',
             cwd=cwd,
             creationflags=creation_flags,
             # On Windows, also try to use the same console
