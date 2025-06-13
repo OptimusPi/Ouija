@@ -10,13 +10,14 @@
 # Installer settings
 Name "${APP_NAME} v${APP_VERSION}"
 OutFile "Ouija-v${APP_VERSION}-Setup.exe"
-InstallDir "$PROGRAMFILES64\${APP_NAME}"
-InstallDirRegKey HKLM "Software\${APP_NAME}" "InstallDir"
-RequestExecutionLevel admin
+InstallDir "$LOCALAPPDATA\${APP_NAME}"
+InstallDirRegKey HKCU "Software\${APP_NAME}" "InstallDir"
+RequestExecutionLevel user
 
 # Modern UI
 !include "MUI2.nsh"
 !include "x64.nsh"
+!include "FileFunc.nsh"
 
 # Interface settings
 !define MUI_ABORTWARNING
@@ -31,12 +32,9 @@ RequestExecutionLevel admin
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 
-# Finish page with options
-!define MUI_FINISHPAGE_RUN "$INSTDIR\Ouija-UI.exe"
-!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\README.md"
-!define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
-!define MUI_FINISHPAGE_RUN_TEXT "Start ${APP_NAME}"
-!define MUI_FINISHPAGE_RUN_NOTCHECKED
+# Finish page - clean and simple
+!define MUI_FINISHPAGE_TITLE "Installation Complete"
+!define MUI_FINISHPAGE_TEXT "${APP_NAME} has been successfully installed to your computer.$\r$\n$\r$\nYou can start ${APP_NAME} from the Start Menu."
 
 !insertmacro MUI_PAGE_FINISH
 
@@ -74,27 +72,33 @@ Section "Core Application" SecCore
     File /r "distribution\Ouija-v${APP_VERSION}-Windows\ouija_filters\*.*"
     SetOutPath "$INSTDIR\ouija_configs"
     File /r "distribution\Ouija-v${APP_VERSION}-Windows\ouija_configs\*.*"
-    
-    # Registry entries
-    WriteRegStr HKLM "Software\${APP_NAME}" "InstallDir" "$INSTDIR"
-    WriteRegStr HKLM "Software\${APP_NAME}" "Version" "${APP_VERSION}"
-    
-    # Uninstaller
+      # Registry entries
+    WriteRegStr HKCU "Software\${APP_NAME}" "InstallDir" "$INSTDIR"
+    WriteRegStr HKCU "Software\${APP_NAME}" "Version" "${APP_VERSION}"
+      # Uninstaller
     WriteUninstaller "$INSTDIR\Uninstall.exe"
-      # Add/Remove Programs entry
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayName" "${APP_NAME}"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayVersion" "${APP_VERSION}"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "Publisher" "${APP_PUBLISHER}"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "URLInfoAbout" "${APP_URL}"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "HelpLink" "${APP_SUPPORT_URL}"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "UninstallString" "$INSTDIR\Uninstall.exe"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "InstallLocation" "$INSTDIR"
-    # Copy icon to Windows dir for Add/Remove Programs
+    
+    # Add/Remove Programs entry
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayName" "${APP_NAME}"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayVersion" "${APP_VERSION}"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "Publisher" "${APP_PUBLISHER}"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "URLInfoAbout" "${APP_URL}"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "HelpLink" "${APP_SUPPORT_URL}"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "UninstallString" "$INSTDIR\Uninstall.exe"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "InstallLocation" "$INSTDIR"
+      # Copy icon to Windows dir for Add/Remove Programs
     SetOutPath "$INSTDIR"
     File "/oname=icon.ico" "icon.ouija.ico"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayIcon" "$INSTDIR\icon.ico"
-    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "NoModify" 1
-    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "NoRepair" 1
+    
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "DisplayIcon" "$INSTDIR\icon.ico"
+    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "NoModify" 1
+    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "NoRepair" 1
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "QuietUninstallString" "$INSTDIR\Uninstall.exe /S"
+    
+    # Calculate estimated size (optional but recommended)
+    ${GetSize} "$INSTDIR" "/S=0K" $0 $1 $2
+    IntFmt $0 "0x%08X" $0
+    WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}" "EstimatedSize" "$0"
 SectionEnd
 
 Section "Desktop Shortcut" SecDesktop
@@ -134,9 +138,8 @@ Function .onInit
         MessageBox MB_OK|MB_ICONSTOP "This application requires 64-bit Windows."
         Abort
     ${EndIf}
-    
-    # Check for existing installation
-    ReadRegStr $0 HKLM "Software\${APP_NAME}" "InstallDir"
+      # Check for existing installation
+    ReadRegStr $0 HKCU "Software\${APP_NAME}" "InstallDir"
     ${If} $0 != ""
         MessageBox MB_YESNO|MB_ICONQUESTION "${APP_NAME} is already installed. Do you want to continue?" IDYES continue
         Abort
@@ -176,14 +179,27 @@ Section "Uninstall"    # Remove files
     # Remove shortcuts
     Delete "$DESKTOP\${APP_NAME}.lnk"
     RMDir /r "$SMPROGRAMS\${APP_NAME}"
-    
-    # Remove registry entries
-    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
-    DeleteRegKey HKLM "Software\${APP_NAME}"
+      # Remove registry entries
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APP_NAME}"
+    DeleteRegKey HKCU "Software\${APP_NAME}"
     
     # Remove installation directory
     RMDir "$INSTDIR"
 SectionEnd
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

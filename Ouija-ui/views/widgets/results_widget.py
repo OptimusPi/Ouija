@@ -1,12 +1,14 @@
 """
 Results Table Widget - Handles the results table and action buttons
 """
+import json
 import tkinter as tk
 from tkinter import ttk, messagebox
 import pandas as pd
 from pandastable import Table
 from utils.ui_utils import (BLUE, RED, GREEN, BACKGROUND, DARK_BACKGROUND, LIGHT_TEXT)
-
+from tkinter import filedialog
+from models.database_model import DatabaseModel
 
 class ResultsWidget:
     """Widget for displaying search results and action buttons"""
@@ -28,9 +30,11 @@ class ResultsWidget:
         self.latest_df = None
         self.pt = None
         self._refresh_timer_id = None
-        
-        # Create the widget
+          # Create the widget
         self.create_widget()
+        
+        # Initialize the display with current config values
+        self.update_config_display()
         
     def create_widget(self):
         """Create the results table section with optimized spacing"""
@@ -50,7 +54,6 @@ class ResultsWidget:
         # Left side buttons
         left_buttons = tk.Frame(button_row, bg=BACKGROUND)
         left_buttons.pack(side=tk.LEFT)
-        
         tk.Button(
             left_buttons,
             text="Refresh",
@@ -58,7 +61,7 @@ class ResultsWidget:
             fg=LIGHT_TEXT,
             font=("m6x11", 12),
             width=10,
-            command=self.on_refresh_results,
+            command=self.refresh_results_table,
         ).pack(side=tk.LEFT, padx=(0, 4))
 
         tk.Button(
@@ -305,6 +308,7 @@ class ResultsWidget:
         if not config_path:
             try:
                 import json
+
                 with open('user.ouija.conf', 'r') as f:
                     user_conf = json.load(f)
                 config_path = user_conf.get('last_config_path')
@@ -323,16 +327,50 @@ class ResultsWidget:
         """Clean up resources when widget is destroyed"""
         if hasattr(self, '_refresh_timer_id') and self._refresh_timer_id:
             self.main_window.root.after_cancel(self._refresh_timer_id)
-            
-    # Event handlers
-    def on_refresh_results(self):
-        """Handle refresh results button clicks"""
-        self.controller.refresh_results()
 
     def on_export_results(self):
         """Handle export results button clicks"""
-        # Delegate to main window's export method
-        self.main_window.on_export_results()
+        # Get the current config path from the controller first
+        config_path = self.controller.get_current_config_path()
+
+        # Fall back to last saved config if needed
+        if not config_path:
+            try:
+                with open('user.ouija.conf', 'r') as f:
+                    user_conf = json.load(f)
+                config_path = user_conf.get('last_config_path')
+            except Exception:
+                config_path = None
+
+        if not config_path:
+            messagebox.showerror("Error", "No config loaded, cannot export.")
+            return
+
+        # Construct default filename from config name
+        filename = config_path.replace(".ouija.conf", ".ouija.csv")
+
+        # Show save file dialog
+        filepath = filedialog.asksaveasfilename(
+            initialfile=filename,
+            defaultextension=".ouija.csv",
+            filetypes=[("Ouija CSV", "*.ouija.csv"), ("CSV Files", "*.csv"),
+                   ("All Files", "*.*")],
+        )
+
+        if filepath:
+            # Export the results to CSV
+
+            db_model = DatabaseModel()
+            if db_model.connect(config_path) and db_model.table_exists():
+                df = db_model.get_dataframe()
+                if df is not None and not df.empty:
+                    df.to_csv(filepath, index=False)
+                    messagebox.showinfo("Export Successful",
+                            f"Results exported to {filepath}")
+                else:
+                    messagebox.showinfo("Export Failed", "No results to export.")
+            else:
+                messagebox.showerror("Error", "Could not connect to database.")
 
     def on_delete_all_results(self):
         """Handle delete all results button clicks"""
@@ -368,8 +406,7 @@ class ResultsWidget:
             else:
                 self.cutoff_var.set("")
             self.cutoff_entry.config(state="normal")
-    
-        self.controller.set_setting('auto_cutoff', self.auto_cutoff_var.get())
+        # Note: cutoff setting is saved automatically by on_cutoff_changed when cutoff_var changes
 
     def on_secret_button_clicked(self):
         """Handle clicking the secret button - reveals fun category buttons"""

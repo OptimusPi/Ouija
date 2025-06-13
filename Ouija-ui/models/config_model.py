@@ -4,6 +4,7 @@ Config Model - Handles configuration data for Ouija seed finder
 
 import json
 import os
+import sys
 
 
 class ConfigModel:
@@ -65,8 +66,8 @@ class ConfigModel:
                     self.gpu_batch = conf["gpu_batch_size"]
                 if conf.get("template"):  # Load template
                     self.template = conf["template"]
-                if conf.get("last_config_path") and os.path.exists(
-                        conf["last_config_path"]):
+                if conf.get("last_config_path"):
+                    # Try to load the config file - don't check if it exists first
                     self.load_config_from_path(conf["last_config_path"])
                 return True
             except Exception as e:
@@ -97,20 +98,57 @@ class ConfigModel:
 
     def load_config_from_path(self, file_path):
         """Load a configuration file from the given path"""
-        if not file_path or not os.path.exists(file_path):
+        if not file_path:
+            return False
+            
+        # Get the directory where the executable is located (for installed version)
+        # or current working directory (for development)
+        if hasattr(sys, '_MEIPASS'):
+            # Running as PyInstaller bundle
+            app_dir = os.path.dirname(sys.executable)
+        else:
+            # Running as script
+            app_dir = os.getcwd()
+            
+        # Try multiple possible locations for the config file
+        possible_paths = [
+            file_path,  # Original path as-is
+            os.path.join(app_dir, file_path),  # App directory + relative path
+            os.path.join(app_dir, os.path.basename(file_path)),  # Just filename in app dir
+            os.path.join(app_dir, "ouija_configs", os.path.basename(file_path)),  # App dir + ouija_configs + filename
+            os.path.join(os.getcwd(), file_path),  # Current working directory + relative path
+            os.path.join(os.getcwd(), os.path.basename(file_path)),  # Just filename in current dir
+            os.path.join("ouija_configs", os.path.basename(file_path)),  # In ouija_configs subdir
+            os.path.join(os.getcwd(), "ouija_configs", os.path.basename(file_path)),  # CWD + ouija_configs + filename
+        ]
+        
+        actual_file_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                actual_file_path = path
+                print(f"DEBUG: Found config file at: {actual_file_path}")
+                break
+                
+        if not actual_file_path:
+            print(f"ERROR: Config file not found. Tried paths:")
+            for i, path in enumerate(possible_paths):
+                print(f"  {i+1}. {path} ({'EXISTS' if os.path.exists(path) else 'NOT FOUND'})")
             return False
 
         try:
-            with open(file_path, "r") as file:
+            with open(actual_file_path, "r") as file:
                 config = json.load(file)
 
             # Clear current configuration
             self.needs_list.clear()
-            self.wants_list.clear(
-            )  # Set configuration name, description, and author
+            self.wants_list.clear()
+            
+            # Set configuration name, description, and author
             # Always use filename for config name, ignore JSON "name" field
-            self.config_name = os.path.basename(file_path).replace(
-                ".ouija.json", "")
+            extracted_name = os.path.basename(actual_file_path).replace(".ouija.json", "")
+            print(f"DEBUG: load_config_from_path() - extracting config name '{extracted_name}' from file path: {actual_file_path}")
+            self.config_name = extracted_name
+            print(f"DEBUG: load_config_from_path() - self.config_name set to: '{self.config_name}'")
             self.config_description = config.get("description", "")
             self.config_author = config.get("author", "")
 
@@ -134,7 +172,7 @@ class ConfigModel:
             self.score_desired_negatives = filter_config.get("scoreDesiredNegatives", True)
 
             # Update state tracking
-            self.loaded_config_path = file_path
+            self.loaded_config_path = actual_file_path
             self.config_loaded_from_file = True
             self.config_modified = False
 
@@ -149,8 +187,7 @@ class ConfigModel:
         """Calculate the maximum search ante based on desires."""
         max_ante = 0  # Default value
         for need in self.needs_list:
-            if "desireByAnte" in need and isinstance(need["desireByAnte"],
-                                                     int):
+            if "desireByAnte" in need and isinstance(need["desireByAnte"], int):
                 max_ante = max(max_ante, need["desireByAnte"])
         return max_ante
 
@@ -161,8 +198,7 @@ class ConfigModel:
         # Create configuration object
         config = {
             "name": self.config_name,
-            "description": self.config_description
-                           or f"Filter configuration created by Ouija GUI",
+            "description": self.config_description or f"Filter configuration created by Ouija GUI",
             "author": self.config_author or "Ouija GUI User",
             "filter_config": {
                 "numNeeds": len(self.needs_list),
@@ -183,8 +219,7 @@ class ConfigModel:
             if self.loaded_config_path:
                 file_path = self.loaded_config_path
             else:
-                file_name = self.config_name.lower().replace(
-                    " ", "_") + ".ouija.json"
+                file_name = self.config_name.lower().replace(" ", "_") + ".ouija.json"
                 file_path = os.path.join(self.CONFIG_DIR, file_name)
 
         try:
@@ -209,8 +244,7 @@ class ConfigModel:
             if os.path.exists(self.CONFIG_DIR):
                 for file in os.listdir(self.CONFIG_DIR):
                     if file.endswith(".ouija.json"):
-                        config_files.append(os.path.join(
-                            self.CONFIG_DIR, file))
+                        config_files.append(os.path.join(self.CONFIG_DIR, file))
         except Exception as e:
             print(f"Error listing config files: {e}")
 
@@ -304,8 +338,7 @@ class ConfigModel:
         """Return the current criteria as a list."""
         criteria = []
         for need in self.config.get("Needs", []):
-            criteria.append(
-                f"Need: {need['value']} (Ante: {need['desireByAnte']})")
+            criteria.append(f"Need: {need['value']} (Ante: {need['desireByAnte']})")
         for want in self.config.get("Wants", []):
             criteria.append(f"Want: {want['value']}")
         return criteria

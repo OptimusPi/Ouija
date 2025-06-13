@@ -1,0 +1,30 @@
+{
+    "name": "kings",
+    "description": "Filter configuration created by Ouija GUI",
+    "author": "Ouija GUI User",
+    "filter_config": {
+        "numNeeds": 1,
+        "numWants": 2,
+        "Needs": [
+            {
+                "value": "Baron",
+                "jokeredition": "No_Edition",
+                "desireByAnte": 8
+            }
+        ],
+        "Wants": [
+            {
+                "value": "King"
+            },
+            {
+                "value": "Baron",
+                "jokeredition": "No_Edition"
+            }
+        ],
+        "maxSearchAnte": 8,
+        "deck": "Erratic_Deck",
+        "stake": "White_Stake",
+        "scoreNaturalNegatives": true,
+        "scoreDesiredNegatives": true
+    }
+}

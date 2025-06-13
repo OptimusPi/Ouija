@@ -18,15 +18,25 @@ from views.main_window import MainWindow
 
 def cleanup_ouija_processes():
     """Ensure all Ouija-CLI.exe processes are terminated when the app exits"""
+    def _get_startup_info():
+        """Get startup info to hide console windows on Windows"""
+        if os.name == "nt":  # Windows
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+            return startupinfo
+        return None
+    
     try:
         if os.name == 'nt':  # Windows
             # Check if any Ouija-CLI.exe processes are running first
             result = subprocess.run(['tasklist', '/FI', 'IMAGENAME eq Ouija-CLI.exe'], 
-                                  capture_output=True, text=True)
+                                  capture_output=True, text=True, startupinfo=_get_startup_info())
             if 'Ouija-CLI.exe' in result.stdout:
                 print("🧹 Cleaning up Ouija-CLI.exe processes...")
                 subprocess.call(['taskkill', '/F', '/IM', 'Ouija-CLI.exe'], 
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                              startupinfo=_get_startup_info())
         else:  # Unix/Linux/Mac
             subprocess.call(['pkill', '-f', 'Ouija-CLI.exe'], 
                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

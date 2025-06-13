@@ -99,12 +99,12 @@ class RunSettingsWidget:
         
         self.starting_seed_var = tk.StringVar()
         self.starting_seed_entry = tk.Entry(seed_frame, textvariable=self.starting_seed_var, 
-                                            font=("m6x11", 12), width=10)
+                                            font=("m6x11", 12), width=11)
         self.starting_seed_entry.grid(row=0, column=0)
         
         random_seed_button = tk.Button(seed_frame, text="🎲", bg=GREEN, fg=LIGHT_TEXT,
-                                    command=self.on_random_seed, font=("m6x11", 12), width=2)
-        random_seed_button.grid(row=0, column=1, padx=(2, 0))
+                                    command=self.on_random_seed, font=("m6x11", 12))
+        random_seed_button.grid(row=0, column=1, padx=(2, 2))
 
         tk.Label(gpu_frame, text="Search Size:", bg=BACKGROUND, fg=LIGHT_TEXT,
                 font=("m6x11", 12)).grid(row=1, column=2, sticky="w", pady=4, padx=(15, 5))
