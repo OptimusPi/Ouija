@@ -56,9 +56,22 @@ class RunSettingsWidget:
         console_frame = tk.Frame(self.run_settings_frame, bg=BACKGROUND)
         console_frame.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
-        self.output_text = tk.Text(console_frame, wrap=tk.WORD, bg=DARK_BACKGROUND, fg=LIGHT_TEXT,
-                                font=("m6x11", 13), insertbackground='white', height=8)
-        self.output_text.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+        # Add vertical scrollbar
+        scrollbar = tk.Scrollbar(console_frame, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.output_text = tk.Text(
+            console_frame,
+            wrap=tk.WORD,
+            bg=DARK_BACKGROUND,
+            fg=LIGHT_TEXT,
+            font=("m6x11", 13),
+            insertbackground='white',
+            height=8,
+            yscrollcommand=scrollbar.set
+        )
+        self.output_text.pack(fill=tk.BOTH, expand=True, padx=4, pady=4, side=tk.LEFT)
+        scrollbar.config(command=self.output_text.yview)
         
     def create_gpu_settings(self):
         """Create the GPU settings in 2x2 grid"""
@@ -136,7 +149,6 @@ class RunSettingsWidget:
             try:
                 if not hasattr(self, 'output_text') or not self.output_text.winfo_exists():
                     return
-
                 # Configure color tags if not already done
                 if not self._color_tags_configured:
                     self.output_text.tag_configure("white", foreground="white")
@@ -156,6 +168,9 @@ class RunSettingsWidget:
                     self.output_text.insert(tk.END, text)
                     end_pos = self.output_text.index(tk.END + "-1c")
                     self.output_text.tag_add("white", start_pos, end_pos)
+
+                # Autoscroll to the end after inserting text
+                self.output_text.see(tk.END)
             except Exception as e:
                 print(f"Error writing to console: {e}")
 
