@@ -43,6 +43,7 @@ class SearchModel:
         self.process_finished_callback = None
         self.cutoff = None  # Add cutoff
         self.gpu_batch = None  # Add gpu_batch
+        self.starting_seed = None  # Initialize starting_seed
 
     def set_callbacks(
             self,
@@ -54,6 +55,14 @@ class SearchModel:
         self.results_callback = results_callback
         self.console_callback = console_callback
         self.process_finished_callback = process_finished_callback
+
+    def set_seed(self, starting_seed):
+        """Set the starting seed for the search process
+
+        Args:
+            starting_seed (int): The seed value to initialize the search.
+        """
+        self.starting_seed = starting_seed
 
     def start_search(
         self,
@@ -76,6 +85,7 @@ class SearchModel:
                 command_parts.extend(["-f", template])
 
             # Add starting seed
+            print(f"DEBUG: Adding starting seed: {starting_seed}")
             if starting_seed.lower() == "random":
                 command_parts.extend(["-s", "random"])
             else:
@@ -213,7 +223,7 @@ class SearchModel:
 
                     try:
                         # Process the CSV line directly using DuckDB's CSV parser
-                        result = db_model.process_csv_line(line, header_columns)
+                        result = db_model.process_csv_line(line)
 
                         if not result:
                             continue
@@ -235,12 +245,8 @@ class SearchModel:
                         # Periodically notify controller to refresh from DB
                         current_time = time.time()                        
                         if (current_time - last_db_ping_time) >= db_ping_interval:
-                            if (
-                                    self.results_callback
-                            ):  # This callback now signals to refresh from DB
-                                self.results_callback(
-                                    None, None
-                                )  # Pass None, None as data is in DB
+                            if (self.results_callback):
+                                self.results_callback(None, None)
                                 last_db_ping_time = current_time
                     except Exception as e:
                         import traceback
@@ -272,7 +278,7 @@ class SearchModel:
 
             # Remove process from active list
             if process in self.active_processes:
-                self.active_processes.remove(process)            # Call process finished callback
+                self.active_processes.remove(process)
             if self.process_finished_callback:
                 self.process_finished_callback()
 

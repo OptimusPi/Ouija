@@ -4,7 +4,6 @@ Config Model - Handles configuration data for Ouija seed finder
 
 import json
 import os
-import sys
 
 
 class ConfigModel:
@@ -101,21 +100,9 @@ class ConfigModel:
         if not file_path:
             return False
             
-        # Get the directory where the executable is located (for installed version)
-        # or current working directory (for development)
-        if hasattr(sys, '_MEIPASS'):
-            # Running as PyInstaller bundle
-            app_dir = os.path.dirname(sys.executable)
-        else:
-            # Running as script
-            app_dir = os.getcwd()
-            
         # Try multiple possible locations for the config file
         possible_paths = [
             file_path,  # Original path as-is
-            os.path.join(app_dir, file_path),  # App directory + relative path
-            os.path.join(app_dir, os.path.basename(file_path)),  # Just filename in app dir
-            os.path.join(app_dir, "ouija_configs", os.path.basename(file_path)),  # App dir + ouija_configs + filename
             os.path.join(os.getcwd(), file_path),  # Current working directory + relative path
             os.path.join(os.getcwd(), os.path.basename(file_path)),  # Just filename in current dir
             os.path.join("ouija_configs", os.path.basename(file_path)),  # In ouija_configs subdir

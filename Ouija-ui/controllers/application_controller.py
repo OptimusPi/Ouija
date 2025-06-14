@@ -46,14 +46,16 @@ class ApplicationController:
 
     def _on_search_completed(self):
         """Enhanced search completion handler that supports fun searches"""
+        if self.current_view is None:
+            print("Warning: Attempted to access UI elements after they were destroyed.")
+            return
+
+        # Existing logic for handling search completion
         if self.fun_search_controller.is_fun_search_active():
-            # Handle fun search completion
             more_searches = self.fun_search_controller.handle_search_completed()
             if not more_searches:
-                # Fun search fully complete
                 return
         else:
-            # Normal search completion
             self.search_controller._on_search_completed()
 
     # === Configuration Management (delegated to ConfigController) ===
@@ -125,13 +127,14 @@ class ApplicationController:
         return self.config_controller.get_criteria()
 
     # === Search Management (delegated to SearchController and FunSearchController) ===
-    def run_search(self):
+    def run_search(self, starting_seed=None):
         """Start the search process"""
         if self.search_model.has_active_searches() or self.fun_search_controller.is_fun_search_active():
             # If a search is running, act as stop button
             return self.stop_search()
 
-        result = self.search_controller.run_search()
+        # Pass the starting seed to the search controller if provided
+        result = self.search_controller.run_search(starting_seed=starting_seed)
         return result.success
 
     def stop_search(self):
@@ -149,8 +152,24 @@ class ApplicationController:
     # === Database Management (delegated to DatabaseController) ===
     def refresh_results(self):
         """Refresh results from the database"""
+        if not self.database_controller.is_ready():
+            print("Error: Database is not ready. Skipping refresh_results.")
+            return False
+
         result = self.database_controller.refresh_results()
-        return result.success
+        if result is None or not result.success:
+            print("Error: refresh_results returned None or failed")
+            return False
+
+        # Fetch the data to update the table
+        data = self.database_controller.get_results_data()
+        if data is None or data.empty:
+            print("Error: No data available to refresh results table")
+            return False
+
+        # Update the results table
+        self.refresh_results_table(data)
+        return True
 
     def delete_all_results(self):
         """Delete all results from the database"""
@@ -213,6 +232,8 @@ class ApplicationController:
     # === Cleanup ===
     def cleanup(self):
         """Clean up resources before application exit"""
+
+        # Ensure all threads and asynchronous operations are stopped
         self.search_controller.cleanup()
         self.fun_search_controller.cleanup()
         self.database_controller.close()

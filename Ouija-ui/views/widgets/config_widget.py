@@ -22,7 +22,9 @@ class ConfigWidget:
             "Erratic Ranks": "ouija_template_erratic_ranks",
             "Erratic Suits": "ouija_template_erratic_suits",
             "Anaglyph": "ouija_template_anaglyph",
+            "Anaglyph Perkeo": "ouija_template_anaglyph_perkeo",
             "Natural Negatives": "ouija_template_negatives",
+            "Rares": "ouija_template_rares",
             "Legendary Negatives": "ouija_template_negative_legendaries",
         }
         

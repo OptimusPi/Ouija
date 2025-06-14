@@ -4,6 +4,7 @@ Search Controller - Handles search operations and process management
 
 from utils.result import Result
 import os
+import tkinter as tk
 
 
 class SearchController:
@@ -31,8 +32,11 @@ class SearchController:
         """Register the main view for callbacks"""
         self.current_view = view
 
-    def run_search(self):
+    def run_search(self, starting_seed=None):
         """Start the search process
+        
+        Args:
+            starting_seed (int, optional): The seed value to initialize the search. Defaults to None.
         
         Returns:
             Result: Success/failure with error details
@@ -70,10 +74,16 @@ class SearchController:
                 self.current_view.set_status(f"Error: Failed to connect to database for {config_name}.")
             return Result.error(f"Failed to connect to database for {config_name}")
 
+        # Pass the starting_seed to the search model if provided
+        if starting_seed is not None:
+            self.search_model.set_seed(starting_seed)
+        else:
+            starting_seed = self.config_controller.get_setting("starting_seed")
+
         # Start the search, passing the config_name to be used by the CLI
         success = self.search_model.start_search(
             config_name_for_cli=config_name, # Pass the name for the CLI
-            starting_seed=self.config_controller.get_setting("starting_seed"),
+            starting_seed=starting_seed,  # Use the prioritized starting_seed
             thread_groups=self.config_controller.get_setting("thread_groups"),
             number_of_seeds=self.config_controller.get_setting("number_of_seeds"),
             db_model=self.database_controller.database_model,
@@ -206,11 +216,20 @@ class SearchController:
             
             self.database_controller.refresh_results()
             if self.current_view:
-                self.current_view.write_to_console("--- Search Complete ---\n", color="white")
-                self.current_view.set_search_running(False)
+                # Check if UI elements are still valid before accessing them
+                try:
+                    self.current_view.write_to_console("--- Search Complete ---\n", color="white")
+                    self.current_view.set_search_running(False)
+                except tk.TclError:
+                    # UI elements have been destroyed, skip UI updates
+                    print("Warning: UI elements destroyed during search completion callback")
         except Exception as e:
             if self.current_view:
-                self.current_view.write_to_console(f"⚠️ Error in search completion: {e}\n", color="red")
+                try:
+                    self.current_view.write_to_console(f"⚠️ Error in search completion: {e}\n", color="red")
+                except tk.TclError:
+                    # UI elements have been destroyed, just print to console
+                    print(f"Error in _on_search_completed (UI destroyed): {e}")
             print(f"Error in _on_search_completed: {e}")
 
     def cleanup(self):

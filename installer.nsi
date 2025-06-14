@@ -32,9 +32,12 @@ RequestExecutionLevel user
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 
-# Finish page - clean and simple
-!define MUI_FINISHPAGE_TITLE "Installation Complete"
-!define MUI_FINISHPAGE_TEXT "${APP_NAME} has been successfully installed to your computer.$\r$\n$\r$\nYou can start ${APP_NAME} from the Start Menu."
+# Finish page with options
+!define MUI_FINISHPAGE_RUN "$INSTDIR\Ouija-UI.exe"
+!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\README.md"
+!define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
+!define MUI_FINISHPAGE_RUN_TEXT "Start ${APP_NAME}"
+!define MUI_FINISHPAGE_RUN_NOTCHECKED
 
 !insertmacro MUI_PAGE_FINISH
 
@@ -186,9 +189,6 @@ Section "Uninstall"    # Remove files
     # Remove installation directory
     RMDir "$INSTDIR"
 SectionEnd
-
-
-
 
 
 

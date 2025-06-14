@@ -124,7 +124,7 @@ class RunSettingsWidget:
 
     def write_to_console(self, text, color=None):
         """Write text to the console output with optional color coding
-        
+
         Args:
             text: Text to write to console
             color: Optional color for the text ("white", "blue", "red")
@@ -132,9 +132,11 @@ class RunSettingsWidget:
                   - BLUE: Ouija-CLI messages (status, CSV results, speedometer)
                   - RED: Ouija-CLI stderr messages
         """
-        # Check if widgets still exist before trying to use them
-        try:
-            if hasattr(self, 'output_text') and self.output_text.winfo_exists():
+        def _write():
+            try:
+                if not hasattr(self, 'output_text') or not self.output_text.winfo_exists():
+                    return
+
                 # Configure color tags if not already done
                 if not self._color_tags_configured:
                     self.output_text.tag_configure("white", foreground="white")
@@ -142,34 +144,38 @@ class RunSettingsWidget:
                     self.output_text.tag_configure("red", foreground="#F94C3E")
                     self.output_text.tag_configure("green", foreground="#4CAF50")
                     self._color_tags_configured = True
-                
+
                 # Insert text with appropriate color tag
                 if color:
-                    # Get current position
                     start_pos = self.output_text.index(tk.END + "-1c")
                     self.output_text.insert(tk.END, text)
                     end_pos = self.output_text.index(tk.END + "-1c")
-                    
-                    # Apply color tag to the inserted text
                     self.output_text.tag_add(color, start_pos, end_pos)
                 else:
-                    # Default color (white) for unspecified text
                     start_pos = self.output_text.index(tk.END + "-1c")
                     self.output_text.insert(tk.END, text)
                     end_pos = self.output_text.index(tk.END + "-1c")
                     self.output_text.tag_add("white", start_pos, end_pos)
-                
-                self.output_text.see(tk.END)
-        except tk.TclError:
-            # Widget has been destroyed, silently ignore
-            pass
+            except Exception as e:
+                print(f"Error writing to console: {e}")
+
+        # Ensure the main thread is running the event loop before scheduling
+        try:
+            if hasattr(self, 'output_text'):
+                self.output_text.after(0, _write)
+        except RuntimeError as e:
+            print(f"Error scheduling write_to_console: {e}")
 
     def on_run_search(self):
         """Handle run search button clicks"""
         if self.search_running:
             self.controller.stop_search()
         else:
-            self.controller.run_search()
+            # Save the current configuration before starting the search
+            self.controller.save_config()
+            # Pass the starting seed value to the controller
+            starting_seed = self.starting_seed_var.get()
+            self.controller.run_search(starting_seed=starting_seed)
 
     def update_display(self):
         """Update the GPU settings display with current settings"""
@@ -227,8 +233,9 @@ class RunSettingsWidget:
         """Handle run search button clicks"""
         if self.search_running:
             self.controller.stop_search()
-        else:            # Check if we need to build kernels first
-            if self.controller.is_kernel_build_needed():
-                self.controller.run_kernel_build()
-            else:
-                self.controller.run_search()
+        else:
+            # Save the current configuration before starting the search
+            self.controller.save_config()
+            # Pass the starting seed value to the controller
+            starting_seed = self.starting_seed_var.get()
+            self.controller.run_search(starting_seed=starting_seed)

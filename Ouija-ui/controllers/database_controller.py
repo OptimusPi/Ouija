@@ -4,6 +4,7 @@ Database Controller - Handles database operations and results management
 
 import json
 import os
+import threading
 
 from utils.result import Result
 
@@ -45,29 +46,23 @@ class DatabaseController:
             return Result.error(f"Database connection error: {str(e)}")
 
     def refresh_results(self):
-        """Refresh results from the database
-        
-        Returns:
-            Result: Success/failure with data or error details
-        """
+        """Refresh results from the database when new results are received."""
         try:
+            print("DEBUG: refresh_results called.")
             df = self.database_model.get_dataframe()
-            if df is not None and not df.empty:
-                if self.current_view:
+            if df is not None:
+                print(f"DEBUG: Retrieved dataframe with {len(df)} rows.")
+                if self.current_view and not df.empty:
                     self.current_view.update_results_table(df)
-                return Result.success(df)
+                else:
+                    if self.current_view:
+                        self.current_view.write_to_console("⚠️ No results found in the database.\n")
             else:
-                if self.current_view:
-                    self.current_view.write_to_console("⚠️ No results found in the database.\n")
-                # If no results, return empty DataFrame
-                if self.current_view:
-                    self.current_view.update_results_table(None)
-                return Result.success(None)
+                print("DEBUG: Dataframe is None.")
         except Exception as e:
-            error_msg = f"Error refreshing results: {str(e)}"
+            print(f"DEBUG: Exception in refresh_results: {str(e)}")
             if self.current_view:
-                self.current_view.write_to_console(f"⚠️ {error_msg}\n")
-            return Result.error(error_msg)
+                self.current_view.write_to_console(f"Error refreshing results: {str(e)}\n")
 
     def delete_all_results(self):
         """Delete all results from the database
@@ -76,6 +71,7 @@ class DatabaseController:
             Result: Success/failure with error details
         """
         try:
+            print("Deleting all results from the database...\n")
             # Get the current config path to determine which database to clear
             with open("user.ouija.conf", "r") as f:
                 user_conf = json.load(f)
@@ -155,3 +151,7 @@ class DatabaseController:
             return Result.success("Database connection closed")
         except Exception as e:
             return Result.error(f"Error closing database: {str(e)}")
+
+    def is_ready(self):
+        """Check if the database is ready for operations"""
+        return self.database_model.conn is not None and self.database_model.table_exists()

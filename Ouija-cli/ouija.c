@@ -36,7 +36,7 @@ void createBinaryPath(const char *executable_dir, const char *filter_name, char 
 int main(int argc, char **argv)
 {
     // Print version
-    printf_s("Ouija-CLI Beta v0.4.1\n");
+    printf_s("Ouija-CLI Beta v0.4.3\n");
     printf_s("pifreak loves you!\n");
     fflush(stdout);
 

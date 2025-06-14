@@ -168,38 +168,43 @@ class DatabaseModel:
                 print(f"Error creating results table: {e}")
                 return False
 
-    def delete_all_results(self):
-        """Delete all results by completely removing and recreating the database file"""
+    def delete_all_results(self, force_delete_file=False):
+        """Delete all results by clearing the results table or removing the database file if needed"""
         with self.db_lock:
+            print(f"DEBUG: delete_all_results called with force_delete_file={force_delete_file}")
             if not self.connection or not self.current_db_path:
+                print("DEBUG: No active connection or database path.")
                 return False
 
             try:
-                # Close the database connection
-                self.connection.close()
-                self.connection = None
-                self.conn = None
-
-                # Remove the database file if it exists
-                db_path = Path(self.current_db_path)
-                if db_path.exists():
-                    os.remove(db_path)
-
-                # Reset schema tracking and connection state
-                self._schema_established = False
-                self.header_columns = None                # Reconnect to create a fresh database
-                if self.current_config_path:
-                    self.connect(self.current_config_path)
-                    if self.on_results_table_reset:
-                        self.on_results_table_reset()
+                if force_delete_file:
+                    print("DEBUG: Deleting database file.")
+                    # Close the connection and delete the database file
+                    self.connection.close()
+                    os.remove(self.current_db_path)
+                    self.connection = None
+                    self.current_db_path = None
+                    print("DEBUG: Database file deleted due to column changes.")
                     return True
-                return False
+
+                # Drop the results table entirely
+                print("DEBUG: Dropping results table.")
+                cursor = self.connection.cursor()
+                cursor.execute("DROP TABLE IF EXISTS results;")
+                self.connection.commit()
+
+                # Reset schema tracking
+                self._schema_established = False
+                self.header_columns = None
+
+                print("DEBUG: Results table dropped and schema reset.")
+                return True
 
             except Exception as e:
-                print(f"Error deleting database file: {e}")
+                print(f"DEBUG: Exception in delete_all_results: {str(e)}")
                 return False
 
-    def process_csv_line(self, line, header_columns=None):
+    def process_csv_line(self, line):
         """Process a CSV line directly from string"""
         with self.db_lock:
             if not self.conn:
@@ -214,6 +219,39 @@ class DatabaseModel:
 
                 # Split by comma
                 parts = csv_line.split(",")
+
+                # Detect header line and recreate database if necessary
+                if csv_line.startswith("+"):
+                    print("DEBUG: Detected header row.")
+                    parts = csv_line[1:].split(",")  # Remove the leading '+' and split
+                    print(f"DEBUG: Current headers: {self.header_columns}")
+                    print(f"DEBUG: New headers: {[col.strip().lower() for col in parts]}")
+
+                    normalized_headers = [col.strip().lower() for col in parts]
+                    if self.header_columns is None:
+                        self.header_columns = normalized_headers  # Normalize headers
+                        print("DEBUG: Initializing headers and creating table.")
+                        self.create_table(self.header_columns)
+                    elif self.header_columns != normalized_headers:
+                        print("DEBUG: Header columns have changed. Recreating table with new schema.")
+                        self.header_columns = normalized_headers  # Update header columns
+
+                        # Drop and recreate the table with the updated schema
+                        cursor = self.connection.cursor()
+                        cursor.execute("DROP TABLE IF EXISTS results;")
+                        self.connection.commit()
+                        self.create_table(self.header_columns)
+                        print("DEBUG: Table recreated with new schema.")
+                    else:
+                        print("DEBUG: Header columns match. No action needed.")
+                elif csv_line.startswith("|"):
+                    print("DEBUG: Detected data row.")
+                    parts = csv_line[1:].split(",")  # Remove the leading '|' and split
+                    # Ensure the correct number of columns
+                    if len(parts) < len(self.header_columns):
+                        parts.extend([""] * (len(self.header_columns) - len(parts)))
+                    elif len(parts) > len(self.header_columns):
+                        parts = parts[:len(self.header_columns)]
 
                 # Process values: first value (Seed) is STRING, all others are INTEGER
                 values = []
@@ -231,17 +269,17 @@ class DatabaseModel:
                             values.append(0)  # Default to 0 if conversion fails
 
                 # Use provided header columns or generate default ones
-                if header_columns is None:
-                    header_columns = ["Seed"]
-                    header_columns.extend([f"Col{i}" for i in range(1, len(values))])
+                if self.header_columns is None:
+                    self.header_columns = ["Seed"]
+                    self.header_columns.extend([f"Col{i}" for i in range(1, len(values))])
 
                 # Ensure values match header length
-                if len(values) < len(header_columns):
-                    values.extend([0] * (len(header_columns) - len(values)))
-                elif len(values) > len(header_columns):
-                    values = values[: len(header_columns)]
+                if len(values) < len(self.header_columns):
+                    values.extend([0] * (len(self.header_columns) - len(values)))
+                elif len(values) > len(self.header_columns):
+                    values = values[: len(self.header_columns)]
 
-                return header_columns, values
+                return self.header_columns, values
             except Exception as e:
                 print(f"Error processing CSV line: {e}")
                 return None

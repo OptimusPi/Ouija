@@ -11,3 +11,7 @@ distribution/
 /distribution
 *.log
 ouija_error.log
+/ouija_database
+/ouija_configs
+/ouija_database
+/ouija_filters
