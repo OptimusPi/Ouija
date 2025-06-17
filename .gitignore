@@ -15,3 +15,7 @@ ouija_error.log
 /ouija_configs
 /ouija_database
 /ouija_filters
+/build/.cmake
+/build/CMakeFiles
+/ouija_filters
+/build
