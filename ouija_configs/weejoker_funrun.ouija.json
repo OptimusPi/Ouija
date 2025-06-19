@@ -3,33 +3,18 @@
     "description": "Filter configuration created by Ouija GUI",
     "author": "Ouija GUI User",
     "filter_config": {
-        "numNeeds": 5,
-        "numWants": 2,
+        "numNeeds": 2,
+        "numWants": 5,
         "Needs": [
-            {
-                "value": "Blueprint",
-                "jokeredition": "No_Edition",
-                "desireByAnte": 3
-            },
             {
                 "value": "Wee_Joker",
                 "jokeredition": "No_Edition",
                 "desireByAnte": 1
             },
             {
-                "value": "Brainstorm",
+                "value": "Hack",
                 "jokeredition": "No_Edition",
-                "desireByAnte": 8
-            },
-            {
-                "value": "Perkeo",
-                "jokeredition": "No_Edition",
-                "desireByAnte": 3
-            },
-            {
-                "value": "Hanging_Chad",
-                "jokeredition": "No_Edition",
-                "desireByAnte": 1
+                "desireByAnte": 4
             }
         ],
         "Wants": [
@@ -37,11 +22,23 @@
                 "value": "2"
             },
             {
+                "value": "Hack",
+                "jokeredition": "No_Edition"
+            },
+            {
+                "value": "Blueprint",
+                "jokeredition": "No_Edition"
+            },
+            {
+                "value": "Perkeo",
+                "jokeredition": "No_Edition"
+            },
+            {
                 "value": "Hanging_Chad",
                 "jokeredition": "No_Edition"
             }
         ],
-        "maxSearchAnte": 8,
+        "maxSearchAnte": 4,
         "deck": "Erratic_Deck",
         "stake": "White_Stake",
         "scoreNaturalNegatives": true,
