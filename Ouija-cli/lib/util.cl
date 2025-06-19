@@ -45,9 +45,11 @@ void print_text(text x) {
     printf("\n");
 }
 
-double fract(double f) {
-    return f-floor(f);
-}
+// Overloadable fract functions for AMD and other OpenCL implementations
+__attribute__((overloadable))
+float fract(float x) { return x - floor(x); }
+__attribute__((overloadable))
+double fract(double x) { return x - floor(x); }
 
 double pseudohash(text s) {
     double num = 1;

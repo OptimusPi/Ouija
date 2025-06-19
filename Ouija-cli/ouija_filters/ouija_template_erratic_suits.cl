@@ -1,8 +1,10 @@
 #include "lib/ouija.cl"
 
-void ouija_filter(instance *inst, __constant OuijaConfig *config,
-                  __global OuijaResult *result) {
+OuijaResult ouija_filter(instance *inst, __constant OuijaConfig *config) {
   set_deck(inst, Erratic_Deck);
+
+  // Create local result to return
+  OuijaResult result;
 
   int suit_counts[4] = {0, 0, 0, 0};
   item deck[52];
@@ -21,12 +23,12 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
 
 #pragma unroll
   for (int i = 0; i < 4; i++) {
-    result->ScoreWants[i] = suit_counts[i];
+    result.ScoreWants[i] = suit_counts[i];
   }
 
-  result->TotalScore = max_score;
-  result->NaturalNegativeJokers = 0;
-  result->DesiredNegativeJokers = 0;
+  result.TotalScore = max_score;
+  result.NaturalNegativeJokers = 0;
+  result.DesiredNegativeJokers = 0;
 
   // Convert seed to string
   text s_str = s_to_string(&inst->seed);
@@ -34,6 +36,8 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
 // Copy seed string efficiently
 #pragma unroll
   for (int i = 0; i < 9; i++) {
-    result->seed[i] = s_str.str[i];
+    result.seed[i] = s_str.str[i];
   }
+  
+  return result;
 }

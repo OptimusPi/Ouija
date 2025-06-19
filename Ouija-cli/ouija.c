@@ -8,6 +8,8 @@
 #include <CL/cl.h>
 #include <assert.h>
 #include <inttypes.h>
+#include <string.h>
+#include <stdbool.h>
 
 #define DEFAULT_BATCH_MULTIPLIER 1
 
@@ -33,6 +35,36 @@ void createBinaryPath(const char *executable_dir, const char *filter_name, char 
              executable_dir, PATH_SEPARATOR, PATH_SEPARATOR, filter_name);
 }
 
+// AMD device check
+static bool is_amd_device(cl_device_id device) {
+    char vendor[256] = {0};
+    clGetDeviceInfo(device, CL_DEVICE_VENDOR, sizeof(vendor), vendor, NULL);
+    return (strstr(vendor, "AMD") != NULL || strstr(vendor, "Advanced Micro") != NULL);
+}
+
+// Determine optimal local work size based on vendor
+static size_t get_optimal_work_group_size(cl_device_id device, cl_kernel kernel, bool is_amd) {
+    size_t preferred_multiple = 0;
+    clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_PREFERRED_WORK_GROUP_SIZE_MULTIPLE,
+                              sizeof(size_t), &preferred_multiple, NULL);
+    size_t max_wg_size = 0;
+    clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, 
+                    sizeof(size_t), &max_wg_size, NULL);
+    if (is_amd) {
+        const size_t wave = 64;
+        size_t opt = preferred_multiple ? preferred_multiple : wave;
+        opt = (opt / wave) * wave;
+        if (opt == 0) opt = wave;
+        return opt;
+    } else {
+        const size_t warp = 32;
+        size_t opt = preferred_multiple ? preferred_multiple : warp;
+        opt = (opt / warp) * warp;
+        if (opt == 0) opt = warp;
+        return opt;
+    }
+}
+
 int main(int argc, char **argv)
 {
     // Print version
@@ -46,9 +78,8 @@ int main(int argc, char **argv)
     size_t numGroups = 16;
     cl_char8 startingSeed;
     for (int i = 0; i < 8; i++) {
-        startingSeed.s[i] = '\0';
-    }
-    cl_long numSeeds = 2318107019761;
+        startingSeed.s[i] = '\0';    }
+    cl_long numSeeds = 1000000000;  // Reasonable default: 1 billion seeds
     int cutoff = 1;
     int auto_cutoff_mode = 0;
     
@@ -57,9 +88,13 @@ int main(int argc, char **argv)
     config.numNeeds = 0;
     config.numWants = 0;
     config.maxSearchAnte = 8;
-    cl_uint batchMultiplier = DEFAULT_BATCH_MULTIPLIER;
-
-    char *filter = "ouija_template";
+    cl_uint batchMultiplier = DEFAULT_BATCH_MULTIPLIER;    char *filter = "ouija_template";  // default filter
+    char filter_name_clean[MAX_PATH];
+    strcpy_s(filter_name_clean, MAX_PATH, filter);
+    size_t filter_len = strlen(filter_name_clean);
+    if (filter_len > 6 && strcmp(filter_name_clean + filter_len - 6, "_fixed") == 0) {
+        filter_name_clean[filter_len - 6] = '\0';
+    }
     char *config_file = NULL;
 
     // --- Argument Parsing Loop ---
@@ -188,8 +223,7 @@ int main(int argc, char **argv)
                 free(devices);
             }
             free(platforms);
-            return 0;
-        }
+            return 0;        }
     }
 
     // Load configuration if specified
@@ -239,6 +273,9 @@ int main(int argc, char **argv)
     clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(compute_units), &compute_units, NULL);
     printf_s("Using device with %u compute units\n", compute_units);
 
+    // --- Check if device is AMD and determine optimal sizes ---
+    bool amd = is_amd_device(device);
+
     // Create context and queue
     cl_context ctx = clCreateContext(NULL, 1, &device, NULL, NULL, &err);
     if (err != CL_SUCCESS) {
@@ -265,7 +302,7 @@ int main(int argc, char **argv)
     
     getExecutableDir(executable_dir);
     snprintf(include_path, sizeof(include_path), "-I \"%s\"", executable_dir);
-    createBinaryPath(executable_dir, filter, binary_path, MAX_PATH);
+    createBinaryPath(executable_dir, filter_name_clean, binary_path, MAX_PATH);
 
     cl_program ssKernelProgram = NULL;
     FILE *fp = NULL;
@@ -294,22 +331,24 @@ int main(int argc, char **argv)
         fclose(fp);
     }
 
-    // If no binary, compile from source
+    // If no binary, compile from source    
     if (!ssKernelProgram) {
-        printf_s("Building kernel from source for filter: %s\n", filter);
-        
+        printf_s("Building kernel from source for filter: %s\n", filter_name_clean);
         snprintf(kernel_path, sizeof(kernel_path), "%s%slib\\ouija_search.cl", executable_dir, PATH_SEPARATOR);
-        if (fopen_s(&fp, kernel_path, "r") != 0 || !fp) {
-            printf_s("Error: Cannot find kernel source at %s\n", kernel_path);
+        
+        // Open source file
+        if (fopen_s(&fp, kernel_path, "r") != 0) {
+            printf_s("ERROR: Failed to open kernel source file: %s\n", kernel_path);
             clReleaseCommandQueue(queue);
             clReleaseContext(ctx);
             free(devices);
             free(platforms);
             return 1;
         }
-
+        
+        // Load kernel source
         char *kernel_code = malloc(MAX_CODE_SIZE);
-        snprintf(kernel_code, MAX_CODE_SIZE, "#include \"ouija_filters/%s.cl\"\n\n", filter);
+        snprintf(kernel_code, MAX_CODE_SIZE, "#include \"ouija_filters/%s.cl\"\n\n", filter_name_clean);
         
         size_t current_len = strlen(kernel_code);
         size_t bytes_read = fread(kernel_code + current_len, 1, MAX_CODE_SIZE - current_len - 1, fp);
@@ -363,8 +402,8 @@ int main(int argc, char **argv)
             }
             free(binary);
         }
-    }
-
+    }    
+    
     // Create kernel
     cl_kernel ssKernel = clCreateKernel(ssKernelProgram, "ouija_search", &err);
     if (err != CL_SUCCESS) {
@@ -377,6 +416,23 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // Handle kernel pre-compilation case (numSeeds = 0)
+    if (numSeeds == 0) {
+        printf_s("Kernel pre-compilation mode detected (numSeeds = 0)\n");
+        printf_s("Kernel compiled and cached successfully. Exiting.\n");
+        clReleaseKernel(ssKernel);
+        clReleaseProgram(ssKernelProgram);
+        clReleaseCommandQueue(queue);
+        clReleaseContext(ctx);
+        free(devices);
+        free(platforms);
+        return 0;
+    }
+
+    // Use the cleaned filter name, not the raw input, for consistency
+    const char *filter_to_print = filter_name_clean;
+    printf_s("Using filter: %s\n", filter_to_print);
+
     // Check work group size
     size_t max_work_group_size;
     clGetKernelWorkGroupInfo(ssKernel, device, CL_KERNEL_WORK_GROUP_SIZE, 
@@ -384,26 +440,50 @@ int main(int argc, char **argv)
     if (numGroups > max_work_group_size) {
         numGroups = max_work_group_size;
         printf_s("Adjusted work group size to %zu\n", numGroups);
-    }    // --- Create Buffers ---
-    // Reasonable batch size calculation - use actual compute units for warp sizing
-    cl_long base_batch_size = numGroups * compute_units; // Use actual compute units (56 for your GPU)
-    cl_long batch_capacity = base_batch_size * batchMultiplier;
-    printf_s("[DEBUG] numGroups=%zu, batchMultiplier=%u\n", numGroups, batchMultiplier);
-    printf_s("[DEBUG] base_batch_size = %zu * %u = %" PRId64 "\n", numGroups, compute_units, base_batch_size);
-    printf_s("[DEBUG] batch_capacity = %" PRId64 " * %u = %" PRId64 "\n", base_batch_size, batchMultiplier, batch_capacity);
-
+    }
     
-    printf_s("Final batch capacity: %" PRId64 " seeds per batch (~%.1f MB)\n", 
-             batch_capacity, (batch_capacity * sizeof(OuijaHostResult)) / (1024.0 * 1024.0));
-
+    // --- Create Buffers ---    // Calculate reasonable number of work-items (NOT all seeds!)
+    // Each work-item will process many seeds and return only the best result
+    size_t compute_units_limit = compute_units > 64 ? 64 : compute_units; // Cap at 64 CUs
+    size_t work_items_per_batch = numGroups * compute_units_limit * batchMultiplier; // Use user's batch multiplier
+    
+    // Only apply minimum work-items for NVIDIA GPUs (they need warp-aligned sizes)
+    if (!amd) {  // Assume non-AMD = NVIDIA for now
+        size_t min_work_items = 32 * compute_units; // NVIDIA warp size = 32
+        if (work_items_per_batch < min_work_items) {
+            work_items_per_batch = min_work_items;
+            printf_s("[DEBUG] Increased work_items_per_batch to minimum NVIDIA-friendly size: %zu\n", work_items_per_batch);
+        }
+    }
+    
+    // Buffer size is now work-items, not total seeds processed!
+    size_t buffer_capacity = work_items_per_batch; // Each work-item returns 1 result
+      printf_s("[DEBUG] numGroups=%zu, compute_units=%u (limited to %zu)\n", 
+             numGroups, compute_units, compute_units_limit);
+    printf_s("[DEBUG] work_items_per_batch=%zu\n", work_items_per_batch);
+    printf_s("[DEBUG] Batch calculation: numGroups(%zu) * compute_units(%u) * batchMultiplier(%u) = %zu seeds per batch\n",
+             numGroups, compute_units, batchMultiplier, (size_t)numGroups * compute_units * batchMultiplier);
+    printf_s("[DEBUG] Each work-item processes ~%" PRId64 " seeds\n", 
+             (numSeeds + work_items_per_batch - 1) / work_items_per_batch);printf_s("Buffer size: %" PRId64 " results (~%.1f MB)\n", 
+             buffer_capacity, (buffer_capacity * sizeof(OuijaHostResult)) / (1024.0 * 1024.0));
+    
     // Config buffer (small, read-only, so traditional buffer is fine)
     cl_mem configBuf = clCreateBuffer(ctx, CL_MEM_READ_ONLY, sizeof(OuijaConfig), NULL, &err);
     clEnqueueWriteBuffer(queue, configBuf, CL_TRUE, 0, sizeof(OuijaConfig), &config, 0, NULL, NULL);
-    OuijaHostResult* results = (OuijaHostResult*)clSVMAlloc(ctx, CL_MEM_READ_WRITE, 
-                                                           sizeof(OuijaHostResult) * batch_capacity, 0);
-    if (!results) {
-        printf_s("ERROR: Failed to allocate SVM buffer. Your GPU doesn't support SVM.\n");
-        printf_s("This program requires a modern GPU (2015 or newer).\n");
+    
+    // --- AMD-safe buffer and work group sizes ---
+    // Check device limits and adjust buffer and work group sizes for AMD
+    size_t max_alloc = 0;
+    clGetDeviceInfo(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(max_alloc), &max_alloc, NULL);
+    size_t max_results = (size_t)(max_alloc * (amd ? 0.4 : 0.9)) / sizeof(OuijaHostResult);
+    size_t batch_capacity = buffer_capacity < max_results ? buffer_capacity : max_results;
+    size_t local_work_size = get_optimal_work_group_size(device, ssKernel, amd);
+    size_t global_work_size = ((batch_capacity + local_work_size - 1) / local_work_size) * local_work_size;
+
+    // Create results buffer with AMD-safe capacity
+    cl_mem resultsBuf = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY, sizeof(OuijaHostResult) * batch_capacity, NULL, &err);
+    if (err != CL_SUCCESS) {
+        printf_s("ERROR: Failed to allocate results buffer: %d\n", err);
         clReleaseKernel(ssKernel);
         clReleaseProgram(ssKernelProgram);
         clReleaseMemObject(configBuf);
@@ -413,17 +493,21 @@ int main(int argc, char **argv)
         free(platforms);
         return 1;
     }
+    
+    // Host memory for results
+    OuijaHostResult* results = (OuijaHostResult*)malloc(sizeof(OuijaHostResult) * batch_capacity);
 
     // Set static kernel arguments (arguments that don't change per batch)
     clSetKernelArg(ssKernel, 0, sizeof(cl_char8), &startingSeed);
     clSetKernelArg(ssKernel, 2, sizeof(cl_mem), &configBuf);
-    clSetKernelArgSVMPointer(ssKernel, 3, results);    // Print CSV header - output headers for the configured wants
+    clSetKernelArg(ssKernel, 3, sizeof(cl_mem), &resultsBuf);
+    
+    // Print CSV header - output headers for the configured wants
     printf_s("+Seed,Score");
     if (config.scoreNaturalNegatives) printf_s(",Natural Negative Jokers");
     if (config.scoreDesiredNegatives) printf_s(",Desired Negative Jokers");
-    
-    // Output headers for configured wants only
-    for (int w = 0; w < config.numWants; w++) {
+      // Output headers for configured wants only
+    for (cl_int w = 0; w < config.numWants; w++) {
         printf_s(",");
         if (config.Wants[w].jokeredition != RETRY && config.Wants[w].jokeredition != No_Edition) {
             print_item_host(config.Wants[w].jokeredition);
@@ -435,66 +519,94 @@ int main(int argc, char **argv)
     }
     printf_s("\n");
     fflush(stdout);
+    // Variables for seed loop, timing, and results
+    clock_t start_time, last_report;
+    cl_long seeds_remaining, current_offset, total_processed, total_found;
+    int first_batch;// Initialize timing and counters
+    start_time = clock();
+    last_report = start_time;
 
+    seeds_remaining = numSeeds;
+    current_offset = 0;
+    total_processed = 0;
+    total_found = 0;
+    first_batch = 1;
 
-    clock_t start_time = clock();
-    clock_t last_report = start_time;
+    // Handle kernel pre-compilation case (numSeeds = 0)
+    if (numSeeds == 0) {
+        printf_s("Kernel pre-compilation complete. Exiting.\n");
+        
+        // Cleanup
+        free(results);
+        clReleaseMemObject(resultsBuf);
+        clReleaseMemObject(configBuf);
+        clReleaseKernel(ssKernel);
+        clReleaseProgram(ssKernelProgram);
+        clReleaseCommandQueue(queue);
+        clReleaseContext(ctx);
+        free(devices);
+        free(platforms);
+        
+        return 0;
+    }    printf_s("Starting search of %" PRId64 " seeds...\n", numSeeds);
     
-    cl_long seeds_remaining = numSeeds;
-    cl_long current_offset = 0;
-    cl_long total_processed = 0;
-    cl_long total_found = 0;
-    
-    int first_batch = 1;
-    
-    printf_s("Starting search of %" PRId64 " seeds...\n", numSeeds);
     while (seeds_remaining > 0) {        
-        // Calculate batch size
-        cl_long batch_size = (seeds_remaining > batch_capacity) ? batch_capacity : seeds_remaining;
+        // Calculate proper batch size using user parameters:
+        // batch_size = numGroups (-g) * compute_units (auto-detected) * batchMultiplier (-b)
+        cl_long proper_batch_size = (cl_long)numGroups * (cl_long)compute_units * (cl_long)batchMultiplier;
         
-        // Update kernel arguments for this batch
-        clSetKernelArg(ssKernel, 1, sizeof(cl_long), &batch_size);        // num_seeds_for_this_dispatch
-        clSetKernelArg(ssKernel, 4, sizeof(cl_long), &current_offset);    // batch_seed_offset (direct value)
-        
-        // Calculate work sizes
-        size_t global_work_size = ((batch_size + numGroups - 1) / numGroups) * numGroups;
-        size_t local_work_size = numGroups;
-        
-        // Launch kernel
-        err = clEnqueueNDRangeKernel(queue, ssKernel, 1, NULL, 
-                                    &global_work_size, &local_work_size, 0, NULL, NULL);
+        // Use the smaller of: proper batch size or remaining seeds
+        cl_long batch_size = seeds_remaining < proper_batch_size ? seeds_remaining : proper_batch_size;
+          // Calculate how many seeds each work-item should process
+        cl_long seeds_per_work_item = (batch_size + work_items_per_batch - 1) / work_items_per_batch;
+        if (seeds_per_work_item < 1) seeds_per_work_item = 1;
+
+        printf_s("[DEBUG] Processing batch: offset=%" PRId64 ", batch_size=%" PRId64 ", seeds_per_work_item=%" PRId64 "\n",
+                 current_offset, batch_size, seeds_per_work_item);
+
+        // Update kernel arguments
+        clSetKernelArg(ssKernel, 1, sizeof(cl_long), &batch_size);
+        clSetKernelArg(ssKernel, 4, sizeof(cl_long), &current_offset);
+
+        // Clear the results buffer before each kernel launch (0 = no result found)
+        memset(results, 0, sizeof(OuijaHostResult) * buffer_capacity);
+        err = clEnqueueWriteBuffer(queue, resultsBuf, CL_TRUE, 0, 
+                                   sizeof(OuijaHostResult) * buffer_capacity, 
+                                   results, 0, NULL, NULL);
+        if (err != CL_SUCCESS) {
+            printf_s("Error clearing results buffer: %d\n", err);
+            break;
+        }
+
+        // Launch kernel - let OpenCL choose optimal work-group size
+        size_t global_work_size = work_items_per_batch;
+        err = clEnqueueNDRangeKernel(queue, ssKernel, 1, NULL,
+                                     &global_work_size, NULL, 0, NULL, NULL);
         if (err != CL_SUCCESS) {
             printf_s("Kernel launch failed: %d\n", err);
             break;
         }
-        
-        // Wait for completion
         clFinish(queue);
-        
-        // Map SVM for reading (required for coarse-grain SVM)
-        clEnqueueSVMMap(queue, CL_TRUE, CL_MAP_READ, results, 
-                       sizeof(OuijaHostResult) * batch_size, 0, NULL, NULL);
-        
-        // Process results
+
+        // Read results from device
+        err = clEnqueueReadBuffer(queue, resultsBuf, CL_TRUE, 0,
+                                  sizeof(OuijaHostResult) * buffer_capacity, results, 0, NULL, NULL);
+        if (err != CL_SUCCESS) {
+            printf_s("Failed to read results buffer: %d\n", err);
+            break;
+        }        // Process results
         int batch_high_score = cutoff;
-        for (cl_long i = 0; i < batch_size; i++) {
-            if (results[i].seed[0] == '\0') continue;
-            
+        for (size_t i = 0; i < buffer_capacity; i++) {
+            if (results[i].TotalScore == 0) continue; // Skip invalid results
             if (results[i].TotalScore > batch_high_score) {
                 batch_high_score = results[i].TotalScore;
             }
-            
-            // Skip cutoff scores on first batch in auto mode
-            if (first_batch && auto_cutoff_mode && results[i].TotalScore <= cutoff) {
-                continue;
-            }
-
+            // For manual cutoff (-c param), include results >= cutoff (inclusive)
             if (results[i].TotalScore >= cutoff) {
                 total_found++;
                 printf_s("|%s,%d", results[i].seed, results[i].TotalScore);
                 if (config.scoreNaturalNegatives) printf_s(",%d", results[i].NaturalNegativeJokers);
                 if (config.scoreDesiredNegatives) printf_s(",%d", results[i].DesiredNegativeJokers);
-                // Output configured wants only to match header
                 for (int w = 0; w < config.numWants; w++) {
                     printf_s(",%d", (int)results[i].ScoreWants[w]);
                 }
@@ -502,95 +614,39 @@ int main(int argc, char **argv)
             }
         }
         fflush(stdout);
-        
-        // Update cutoff in auto mode
+
+        // Adjust cutoff dynamically
         if (auto_cutoff_mode && batch_high_score > cutoff) {
             cutoff = batch_high_score;
-            if (first_batch) {
-                printf_s("[AUTO] First batch cutoff set to %d\n", cutoff);
-            }
         }
         first_batch = 0;
-        
-        // Unmap SVM
-        clEnqueueSVMUnmap(queue, results, 0, NULL, NULL);
-        
+
         // Update counters
         total_processed += batch_size;
         current_offset += batch_size;
         seeds_remaining -= batch_size;
-        
-          // Progress report every quarter second
-        clock_t now = clock();
-        if ((now - last_report) > 250) {            
-            double elapsed = (double)(now - start_time) / CLOCKS_PER_SEC;
+
+        // Report progress every 5s or on last batch
+        clock_t current_time = clock();
+        if ((double)(current_time - last_report) / CLOCKS_PER_SEC >= 5.0 || seeds_remaining <= 0) {
+            double elapsed = (double)(current_time - start_time) / CLOCKS_PER_SEC;
             double rate = total_processed / elapsed;
-            double eta_seconds = seeds_remaining / rate;
-            
-            // Calculate elapsed time components
-            int elapsed_minutes = (int)(elapsed / 60);
-            int elapsed_seconds_remainder = (int)elapsed % 60;
-            
-            // Calculate ETA components
-            int eta_days = (int)(eta_seconds / (60 * 60 * 24));
-            int eta_hours = (int)((eta_seconds - (eta_days * 60 * 60 * 24)) / 3600);
-            int eta_minutes = (int)((eta_seconds - (eta_days * 60 * 60 * 24) - (eta_hours * 3600)) / 60);
-            
-            // Format elapsed time string
-            char elapsed_string[64];
-            if (elapsed_minutes > 0) {
-                snprintf(elapsed_string, sizeof(elapsed_string), "in %d minutes and %d seconds", 
-                         elapsed_minutes, elapsed_seconds_remainder);
-            } else {
-                snprintf(elapsed_string, sizeof(elapsed_string), "in %d seconds", 
-                         elapsed_seconds_remainder);
-            }
-            
-            // Format ETA string  
-            char eta_string[128];
-            if (eta_days >= 1) {
-                snprintf(eta_string, sizeof(eta_string), "(ETA: %d days %d hours)", 
-                         eta_days, eta_hours);
-            } else if (eta_hours >= 1) {
-                snprintf(eta_string, sizeof(eta_string), "(ETA: %d hours %d minutes)", 
-                         eta_hours, eta_minutes);
-            } else if (eta_minutes >= 1) {
-                snprintf(eta_string, sizeof(eta_string), "(ETA: %d minutes %d seconds)",
-                        eta_minutes, (int)eta_seconds % 60);
-            } else {
-                snprintf(eta_string, sizeof(eta_string), "(ETA: %d seconds)",
-                        (int)eta_seconds);
-            }
-            
-            // Calculate rarity percentage
-            double rarity_percent = (total_processed > 0) ? (100.0 * total_found / total_processed) : 0.0;
-            
-            // Format searched count with appropriate units (K/M suffix)
-            char searched_string[32];
-            if (total_processed >= 1000000) {
-                snprintf(searched_string, sizeof(searched_string), "%.1fM", total_processed / 1000000.0);
-            } else if (total_processed >= 1000) {
-                snprintf(searched_string, sizeof(searched_string), "%.1fK", total_processed / 1000.0);
-            } else {
-                snprintf(searched_string, sizeof(searched_string), "%" PRId64, total_processed);
-            }
-              // Enhanced progress reporting with new format
-            printf_s("$Found %" PRId64 " valid seeds of %s searched so far. (%.8f%% Rarity!) %s. %s :clock: %.1fK/s\n",
-                     total_found, searched_string, rarity_percent, elapsed_string, eta_string, rate / 1000.0);
-                    
+            double percent = (total_processed * 100.0) / numSeeds;
+            printf_s("[PROGRESS] %.1f%% - %" PRId64 "/%" PRId64 " seeds processed, %" PRId64 " found @%.1f seeds/s\n",
+                     percent, total_processed, numSeeds, total_found, rate);
             fflush(stdout);
-            last_report = now;
+            last_report = current_time;
         }
     }
-    
+
     // Final report
     double total_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
     printf_s("$Search Complete! Found %" PRId64 " viable out of %" PRId64 " total seeds @%.1f seeds/s\n",
              total_found, total_processed,
-             (total_time > 0) ? (total_processed / total_time) : 0.0);
-    fflush(stdout);
-      // --- Cleanup ---
-    clSVMFree(ctx, results);
+             (total_time > 0.0) ? (total_processed / total_time) : 0.0);
+    fflush(stdout);    // --- Cleanup ---
+    free(results);
+    clReleaseMemObject(resultsBuf);
     clReleaseMemObject(configBuf);
     clReleaseKernel(ssKernel);
     clReleaseProgram(ssKernelProgram);
