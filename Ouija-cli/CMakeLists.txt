@@ -1,8 +1,18 @@
-cmake_minimum_required(VERSION 3.10) # 3.1 << C_STANDARD 11
+cmake_minimum_required(VERSION 3.10)
 
-project(Ouija LANGUAGES C)
+project(OuijaCLI C)
 
+# Set the C standard to C11 for compatibility.
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+# Find the OpenCL library and headers. CMake has a built-in module for this.
 find_package(OpenCL REQUIRED)
+
+# Add the 'lib' directory to the list of directories to search for include files.
+include_directories(
+    "${CMAKE_CURRENT_SOURCE_DIR}/lib"
+)
 
 # Add Windows icon resource for Ouija-CLI.exe
 if (WIN32)

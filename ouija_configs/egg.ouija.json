@@ -3,13 +3,18 @@
     "description": "Filter configuration created by Ouija GUI",
     "author": "Ouija GUI User",
     "filter_config": {
-        "numNeeds": 1,
+        "numNeeds": 2,
         "numWants": 1,
         "Needs": [
             {
                 "value": "Egg",
                 "jokeredition": "No_Edition",
                 "desireByAnte": 8
+            },
+            {
+                "value": "Showman",
+                "jokeredition": "No_Edition",
+                "desireByAnte": 2
             }
         ],
         "Wants": [
