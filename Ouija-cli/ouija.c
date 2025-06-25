@@ -296,7 +296,7 @@ int main(int argc, char **argv)
 
     // If no binary, compile from source
     if (!ssKernelProgram) {
-        printf_s("Building kernel from source for filter: %s\n", filter);
+        printf_s("$Building kernel from source for filter: %s\n", filter);
         
         snprintf(kernel_path, sizeof(kernel_path), "%s%slib\\ouija_search.cl", executable_dir, PATH_SEPARATOR);
         if (fopen_s(&fp, kernel_path, "r") != 0 || !fp) {
@@ -447,7 +447,10 @@ int main(int argc, char **argv)
     
     int first_batch = 1;
     
-    printf_s("Starting search of %" PRId64 " seeds...\n", numSeeds);
+    printf_s("\nStarting search of %" PRId64 " seeds:\n\n", numSeeds);
+    printf_s("\n");
+    fflush(stdout);
+
     while (seeds_remaining > 0) {        
         // Calculate batch size
         cl_long batch_size = (seeds_remaining > batch_capacity) ? batch_capacity : seeds_remaining;

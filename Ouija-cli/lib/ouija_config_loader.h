@@ -362,14 +362,6 @@ found_path_or_continue_parsing:
         config->maxSearchAnte = 8; // Default value
     }
 
-    if (config->maxSearchAnte > 8) {
-        printf_s("Warning: maxSearchAnte is set to %d, which is higher than the default of 8.\n", config->maxSearchAnte);
-        printf_s("  - max_search_ante_str is: %s\n", max_search_ante_str);
-        config->maxSearchAnte = 8; // Reset to default
-    } else {
-        printf_s("loaded maxSearchAnte: %d\n", config->maxSearchAnte);
-    }
-
     // Extract deck
     char* deck_str = strstr(filter_config, "\"deck\"");
     if (deck_str) {
