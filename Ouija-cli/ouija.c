@@ -140,7 +140,7 @@ int main(int argc, char **argv)
             for (int j = 0; j < 8 && startingSeed.s[j] != '\0'; j++) {
                 seedStr[j] = startingSeed.s[j];
             }
-            printf_s("Starting seed set to %s\n", seedStr);
+            printf_s("   Starting seed set to %s\n", seedStr);
             fflush(stdout);
             i++;
         }
@@ -447,7 +447,7 @@ int main(int argc, char **argv)
     
     int first_batch = 1;
     
-    printf_s("\nStarting search of %" PRId64 " seeds:\n\n", numSeeds);
+    printf_s("\n    Starting search of %" PRId64 " seeds:\n\n", numSeeds);
     printf_s("\n");
     fflush(stdout);
 

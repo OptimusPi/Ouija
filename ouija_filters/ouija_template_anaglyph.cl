@@ -1,5 +1,5 @@
 #include "lib/ouija.cl"
-// #define CACHE_SIZE 800
+#define CACHE_SIZE 64
 // #define _debugPrintsMAGIC
 // #define _debugPrints1
 
@@ -99,93 +99,85 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
       // If all needs are met, we can skip the pack checks
       packChecks = 0;
     }
+    // Track if any Arcana Pack was found
+    bool foundArcanaPack = false;
     for (int p = 0; p < packChecks; p++) {
-      pack _pack = pack_info(next_pack(inst, ante));
-      if (_pack.type == Arcana_Pack) {
-        item tarotCards[5] = {RETRY, RETRY, RETRY, RETRY, RETRY};
-        arcana_pack(tarotCards, _pack.size, inst, ante);
-        for (int t = 0; t < _pack.size; t++) {
-          if (tarotCards[t] == RETRY)
-            continue;
-          if (tarotCards[t] == The_Soul) {
-            jokerdata soulJoker = next_joker_with_info(inst, S_Soul, ante);
-            if (soulJoker.joker == RETRY) continue;
-
-            // Anaglyph Filter: Only track Needs fulfillment from packs. No scoring.
-            for (int x = 0; x < clampedNumNeeds; x++) {
-                bool soulMatch = (config->Needs[x].value == The_Soul);
-                bool jokerMatch =
-                    (config->Needs[x].jokeredition != RETRY) &&
-                    (config->Needs[x].value == soulJoker.joker) &&
-                    ((config->Needs[x].jokeredition == No_Edition) ||
-                     (config->Needs[x].jokeredition == soulJoker.edition));
-                
-                if (soulMatch || jokerMatch) {
-                    ScoreNeeds[x] = true;
-                }
-            }
-          } else {
-            for (int x = 0; x < clampedNumNeeds; x++) {
-              bool matched = (config->Needs[x].value == tarotCards[t]);
-              ScoreNeeds[x] |= matched;
-            }
-            // Anaglyph Filter: Wants scoring removed from packs.
-          }
+        item _pack_item = next_pack(inst, ante);
+        pack _pack = pack_info(_pack_item);
+        if (_pack.type == Arcana_Pack) {
+            foundArcanaPack = true;
         }
-      } else if (_pack.type == Spectral_Pack) {
-        item spectralCards[5] = {RETRY, RETRY, RETRY, RETRY, RETRY};
-        spectral_pack(spectralCards, _pack.size, inst, ante);
-        for (int t = 0; t < _pack.size; t++) {
-          if (spectralCards[t] == RETRY)
-            continue;
-          if (spectralCards[t] == The_Soul) {
-            jokerdata soulJoker = next_joker_with_info(inst, S_Soul, ante);
-            if (soulJoker.joker == RETRY) continue;
-
-            // Anaglyph Filter: Only track Needs fulfillment from packs. No scoring.
+        jokerdata jokers[5];
+        card stdcards[5];
+        item consumables[5];
+        switch (_pack.type) {
+        case Buffoon_Pack:
+          buffoon_pack_detailed(jokers, _pack.size, inst, ante);
+          for (int i = 0; i < _pack.size; i++) {
             for (int x = 0; x < clampedNumNeeds; x++) {
-                bool soulMatch = (config->Needs[x].value == The_Soul);
-                bool jokerMatch =
-                    (config->Needs[x].jokeredition != RETRY) &&
-                    (config->Needs[x].value == soulJoker.joker) &&
-                    ((config->Needs[x].jokeredition == No_Edition) ||
-                     (config->Needs[x].jokeredition == soulJoker.edition));
-                
-                if (soulMatch || jokerMatch) {
-                    ScoreNeeds[x] = true;
-                }
-            }
-          } else {
-            for (int x = 0; x < clampedNumNeeds; x++) {
-              if (config->Needs[x].value == spectralCards[t]) {
+              if (config->Needs[x].value == jokers[i].joker &&
+                  config->Needs[x].jokeredition == jokers[i].edition) {
                 ScoreNeeds[x] = true;
               }
             }
-            // Anaglyph Filter: Wants scoring removed from packs.
           }
-        }
-      } else if (_pack.type == Buffoon_Pack) {
-        jokerdata buffoonJokers[5];
-        buffoon_pack_detailed(buffoonJokers, _pack.size, inst, ante);
-        for (int t = 0; t < _pack.size; t++) {
-          if (buffoonJokers[t].joker == RETRY)
-            continue;
-          if (buffoonJokers[t].joker == Showman)
-            inst->params.showman = true;
-          
-          // Anaglyph Filter: No scoring from packs. Only track Needs fulfillment.
-          for (int x = 0; x < clampedNumNeeds; x++) {
-            bool jokerMatch =
-                (config->Needs[x].jokeredition != RETRY) &&
-                (config->Needs[x].value == buffoonJokers[t].joker) &&
-                ((config->Needs[x].jokeredition == No_Edition) ||
-                 (config->Needs[x].jokeredition == buffoonJokers[t].edition));
-            if (jokerMatch) {
-              ScoreNeeds[x] = true;
+          break;
+        case Arcana_Pack:
+          arcana_pack(consumables, _pack.size, inst, ante);
+          for (int i = 0; i < _pack.size; i++) {
+            if (consumables[i] == The_Soul) {
+              jokerdata soulJoker = next_joker_with_info(inst, S_Soul, ante);
+              for (int x = 0; x < clampedNumNeeds; x++) {
+                if (config->Needs[x].value == The_Soul || config->Needs[x].value == soulJoker.joker) {
+                  ScoreNeeds[x] = true;
+                }
+              }
+              for (int x = 0; x < clampedNumWants; x++) {
+                if (config->Wants[x].value == The_Soul || config->Wants[x].value == soulJoker.joker) {
+                  result->ScoreWants[x]++;
+                }
+              }
+            } else {
+              for (int x = 0; x < clampedNumNeeds; x++) {
+                if (config->Needs[x].value == consumables[i]) {
+                  ScoreNeeds[x] = true;
+                }
+              }
+              for (int x = 0; x < clampedNumWants; x++) {
+                if (config->Wants[x].value == consumables[i]) {
+                  result->ScoreWants[x]++;
+                }
+              }
             }
           }
+          break;
+        case Celestial_Pack:
+          celestial_pack(consumables, _pack.size, inst, ante);
+          for (int i = 0; i < _pack.size; i++) {
+            for (int x = 0; x < clampedNumNeeds; x++) {
+              if (config->Needs[x].value == consumables[i]) {
+                ScoreNeeds[x] = true;
+              }
+            }
+          }
+          break;
+        case Spectral_Pack:
+          spectral_pack(consumables, _pack.size, inst, ante);
+          for (int i = 0; i < _pack.size; i++) {
+            for (int x = 0; x < clampedNumNeeds; x++) {
+              if (config->Needs[x].value == consumables[i]) {
+                ScoreNeeds[x] = true;
+              }
+            }
+          }
+          break;
+        case Standard_Pack:
+          standard_pack(stdcards, _pack.size, inst, ante);
+          // Needs/wants for standard packs are not supported in this filter yet.
+          break;
+        default:
+          break;
         }
-      }
     }
 
     if (smallBlindTag == Negative_Tag) {
@@ -195,10 +187,12 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
       bool isGrabbing = false; // True once the player "chooses" to start.
       
       // Skip the initial two shop jokers -- but may as well check for showman!
-      if (next_shop_item(inst, ante).value == Showman) {
+      shopitem skip1 = next_shop_item(inst, ante);
+      if (skip1.value == Showman) {
           inst->params.showman = true;
       }
-      if (next_shop_item(inst, ante).value == Showman) {
+      shopitem skip2 = next_shop_item(inst, ante);
+      if (skip2.value == Showman) {
           inst->params.showman = true;
       }
 
@@ -212,7 +206,7 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
 
             // Break if shop is empty (no more items or rerolls available)
             if (_shopitem.value == RETRY) {
-                break;
+                continue;
             }
 
             // We can only make No_Edition jokers negative.
@@ -325,6 +319,38 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
         valid = false;
         break; // Exit the needs-checking loop
       }
+    }
+
+    // After pack loop, check for Charm_Tag and missing Arcana Pack
+    if (!foundArcanaPack && smallBlindTag == Charm_Tag) {
+        item megaArcana[5];
+        arcana_pack(megaArcana, 5, inst, ante);
+        for (int i = 0; i < 5; i++) {
+            if (megaArcana[i] == The_Soul) {
+                jokerdata soulJoker = next_joker_with_info(inst, S_Soul, ante);
+                for (int x = 0; x < clampedNumNeeds; x++) {
+                    if (config->Needs[x].value == The_Soul || config->Needs[x].value == soulJoker.joker) {
+                        ScoreNeeds[x] = true;
+                    }
+                }
+                for (int x = 0; x < clampedNumWants; x++) {
+                    if (config->Wants[x].value == The_Soul || config->Wants[x].value == soulJoker.joker) {
+                        result->ScoreWants[x]++;
+                    }
+                }
+            } else {
+                for (int x = 0; x < clampedNumNeeds; x++) {
+                    if (config->Needs[x].value == megaArcana[i]) {
+                        ScoreNeeds[x] = true;
+                    }
+                }
+                for (int x = 0; x < clampedNumWants; x++) {
+                    if (config->Wants[x].value == megaArcana[i]) {
+                        result->ScoreWants[x]++;
+                    }
+                }
+            }
+        }
     }
   } // End of ante loop
 

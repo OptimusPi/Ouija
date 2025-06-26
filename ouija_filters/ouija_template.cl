@@ -154,183 +154,187 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
       }
     }
     int packChecks = (ante == 1) ? 4 : 6;
+    // Track if any Arcana Pack was found
+    bool foundArcanaPack = false;
     for (int p = 0; p < packChecks; p++) {
       pack _pack = pack_info(next_pack(inst, ante));
-      if (_pack.type == Arcana_Pack) {
-        item tarotCards[5] = {RETRY, RETRY, RETRY, RETRY, RETRY};
-        arcana_pack(tarotCards, _pack.size, inst, ante);
-        for (int t = 0; t < _pack.size; t++) {
-          if (tarotCards[t] == RETRY)
-            continue;
-          if (tarotCards[t] == The_Soul) {
-            jokerdata soulJoker = next_joker_with_info(inst, S_Soul, ante);
-            if (soulJoker.joker == RETRY) continue;
-
-            bool isNegative = soulJoker.edition == Negative;
-            bool isDesiredNegative = false;
-
-            if (config->scoreNaturalNegatives && isNegative) {
-                result->NaturalNegativeJokers += 1;
+      jokerdata jokers[5];
+      item arcanaCards[5];
+      item spectralCards[5];
+      switch (_pack.type) {
+        case Buffoon_Pack:
+          buffoon_pack_detailed(jokers, _pack.size, inst, ante);
+          for (int t = 0; t < _pack.size; t++) {
+            if (jokers[t].joker == RETRY) continue;
+            if (jokers[t].joker == Showman) inst->params.showman = true;
+            if (config->scoreNaturalNegatives) {
+              result->NaturalNegativeJokers += (jokers[t].edition == Negative);
             }
-
-            // Check Needs for The Soul's joker
+            bool desiredNegative = false;
             for (int x = 0; x < clampedNumNeeds; x++) {
-                bool soulMatch = (config->Needs[x].value == The_Soul);
-                bool jokerMatch =
-                    (config->Needs[x].jokeredition != RETRY) &&
-                    (config->Needs[x].value == soulJoker.joker) &&
-                    ((config->Needs[x].jokeredition == No_Edition) ||
-                     (config->Needs[x].jokeredition == soulJoker.edition));
-                
-                if (soulMatch || jokerMatch) {
-                    ScoreNeeds[x] = true;
-                    if (jokerMatch && isNegative) {
-                        isDesiredNegative = true;
-                    }
-                }
-            }
-
-            // Check Wants for The Soul's joker
-            for (int x = 0; x < clampedNumWants; x++) {
-                bool soulMatch = (config->Wants[x].value == The_Soul);
-                bool jokerMatch =
-                    (config->Wants[x].jokeredition != RETRY) &&
-                    (config->Wants[x].value == soulJoker.joker) &&
-                    ((config->Wants[x].jokeredition == No_Edition) ||
-                     (config->Wants[x].jokeredition == soulJoker.edition));
-                
-                if (soulMatch || jokerMatch) {
-                    if (result->ScoreWants[x] == 0 || inst->params.showman == true) {
-                        result->ScoreWants[x] += 1;
-                    }
-                    if (jokerMatch && isNegative) {
-                        isDesiredNegative = true;
-                    }
-                }
-            }
-
-            if (config->scoreDesiredNegatives && isDesiredNegative) {
-                result->DesiredNegativeJokers += 1;
-            }
-          } else {
-            for (int x = 0; x < clampedNumNeeds; x++) {
-              bool matched = (config->Needs[x].value == tarotCards[t]);
-              ScoreNeeds[x] |= matched;
+              bool jokerMatch =
+                (config->Needs[x].jokeredition != RETRY) &&
+                (config->Needs[x].value == jokers[t].joker) &&
+                ((config->Needs[x].jokeredition == No_Edition) ||
+                 (config->Needs[x].jokeredition == jokers[t].edition));
+              if (jokerMatch) ScoreNeeds[x] = true;
+              if (jokerMatch && jokers[t].edition == Negative) desiredNegative = true;
             }
             for (int x = 0; x < clampedNumWants; x++) {
-              result->ScoreWants[x] +=
-                  (config->Wants[x].value == tarotCards[t]);
+              bool jokerMatch =
+                (config->Wants[x].jokeredition != RETRY) &&
+                (config->Wants[x].value == jokers[t].joker) &&
+                ((config->Wants[x].jokeredition == No_Edition) ||
+                 (config->Wants[x].jokeredition == jokers[t].edition));
+              if (jokerMatch && (result->ScoreWants[x] == 0 || inst->params.showman == true)) {
+                result->ScoreWants[x] += 1;
+              }
+              if (jokerMatch && jokers[t].edition == Negative) desiredNegative = true;
+            }
+            if (desiredNegative && config->scoreDesiredNegatives) {
+              result->DesiredNegativeJokers += 1;
             }
           }
-        }
-      } else if (_pack.type == Spectral_Pack) {
-        item spectralCards[5] = {RETRY, RETRY, RETRY, RETRY, RETRY};
-        spectral_pack(spectralCards, _pack.size, inst, ante);
-        for (int t = 0; t < _pack.size; t++) {
-          if (spectralCards[t] == RETRY)
-            continue;
-          if (spectralCards[t] == The_Soul) {
-            jokerdata soulJoker = next_joker_with_info(inst, S_Soul, ante);
-            if (soulJoker.joker == RETRY) continue;
-
-            bool isNegative = soulJoker.edition == Negative;
-            bool isDesiredNegative = false;
-
-            if (config->scoreNaturalNegatives && isNegative) {
+          break;
+        case Arcana_Pack:
+          arcana_pack(arcanaCards, _pack.size, inst, ante);
+          for (int t = 0; t < _pack.size; t++) {
+            if (arcanaCards[t] == RETRY) continue;
+            if (arcanaCards[t] == The_Soul) {
+              jokerdata soulJoker = next_joker_with_info(inst, S_Soul, ante);
+              if (soulJoker.joker == RETRY) continue;
+              bool isNegative = soulJoker.edition == Negative;
+              bool isDesiredNegative = false;
+              if (config->scoreNaturalNegatives && isNegative) {
                 result->NaturalNegativeJokers += 1;
-            }
-
-            // Check Needs for The Soul's joker
-            for (int x = 0; x < clampedNumNeeds; x++) {
+              }
+              for (int x = 0; x < clampedNumNeeds; x++) {
                 bool soulMatch = (config->Needs[x].value == The_Soul);
                 bool jokerMatch =
-                    (config->Needs[x].jokeredition != RETRY) &&
-                    (config->Needs[x].value == soulJoker.joker) &&
-                    ((config->Needs[x].jokeredition == No_Edition) ||
-                     (config->Needs[x].jokeredition == soulJoker.edition));
-                
+                  (config->Needs[x].jokeredition != RETRY) &&
+                  (config->Needs[x].value == soulJoker.joker) &&
+                  ((config->Needs[x].jokeredition == No_Edition) ||
+                   (config->Needs[x].jokeredition == soulJoker.edition));
                 if (soulMatch || jokerMatch) {
-                    ScoreNeeds[x] = true;
-                    if (jokerMatch && isNegative) {
-                        isDesiredNegative = true;
-                    }
+                  ScoreNeeds[x] = true;
+                  if (jokerMatch && isNegative) isDesiredNegative = true;
                 }
-            }
-
-            // Check Wants for The Soul's joker
-            for (int x = 0; x < clampedNumWants; x++) {
+              }
+              for (int x = 0; x < clampedNumWants; x++) {
                 bool soulMatch = (config->Wants[x].value == The_Soul);
                 bool jokerMatch =
-                    (config->Wants[x].jokeredition != RETRY) &&
-                    (config->Wants[x].value == soulJoker.joker) &&
-                    ((config->Wants[x].jokeredition == No_Edition) ||
-                     (config->Wants[x].jokeredition == soulJoker.edition));
-                
+                  (config->Wants[x].jokeredition != RETRY) &&
+                  (config->Wants[x].value == soulJoker.joker) &&
+                  ((config->Wants[x].jokeredition == No_Edition) ||
+                   (config->Wants[x].jokeredition == soulJoker.edition));
                 if (soulMatch || jokerMatch) {
-                    if (result->ScoreWants[x] == 0 || inst->params.showman == true) {
-                        result->ScoreWants[x] += 1;
-                    }
-                    if (jokerMatch && isNegative) {
-                        isDesiredNegative = true;
-                    }
+                  if (result->ScoreWants[x] == 0 || inst->params.showman == true) {
+                    result->ScoreWants[x] += 1;
+                  }
+                  if (jokerMatch && isNegative) isDesiredNegative = true;
                 }
-            }
-
-            if (config->scoreDesiredNegatives && isDesiredNegative) {
+              }
+              if (config->scoreDesiredNegatives && isDesiredNegative) {
                 result->DesiredNegativeJokers += 1;
-            }
-          } else {
-            for (int x = 0; x < clampedNumNeeds; x++) {
-              if (config->Needs[x].value == spectralCards[t]) {
-                ScoreNeeds[x] = true;
+              }
+            } else {
+              for (int x = 0; x < clampedNumNeeds; x++) {
+                bool matched = (config->Needs[x].value == arcanaCards[t]);
+                ScoreNeeds[x] |= matched;
+              }
+              for (int x = 0; x < clampedNumWants; x++) {
+                result->ScoreWants[x] += (config->Wants[x].value == arcanaCards[t]);
               }
             }
-            for (int x = 0; x < clampedNumWants; x++) {
-              result->ScoreWants[x] += config->Wants[x].value == spectralCards[t] ? 1 : 0;
+          }
+          foundArcanaPack = true;
+          break;
+        case Spectral_Pack:
+          spectral_pack(spectralCards, _pack.size, inst, ante);
+          for (int t = 0; t < _pack.size; t++) {
+            if (spectralCards[t] == RETRY) continue;
+            if (spectralCards[t] == The_Soul) {
+              jokerdata soulJoker = next_joker_with_info(inst, S_Soul, ante);
+              if (soulJoker.joker == RETRY) continue;
+              bool isNegative = soulJoker.edition == Negative;
+              bool isDesiredNegative = false;
+              if (config->scoreNaturalNegatives && isNegative) {
+                result->NaturalNegativeJokers += 1;
+              }
+              for (int x = 0; x < clampedNumNeeds; x++) {
+                bool soulMatch = (config->Needs[x].value == The_Soul);
+                bool jokerMatch =
+                  (config->Needs[x].jokeredition != RETRY) &&
+                  (config->Needs[x].value == soulJoker.joker) &&
+                  ((config->Needs[x].jokeredition == No_Edition) ||
+                   (config->Needs[x].jokeredition == soulJoker.edition));
+                if (soulMatch || jokerMatch) {
+                  ScoreNeeds[x] = true;
+                  if (jokerMatch && isNegative) isDesiredNegative = true;
+                }
+              }
+              for (int x = 0; x < clampedNumWants; x++) {
+                bool soulMatch = (config->Wants[x].value == The_Soul);
+                bool jokerMatch =
+                  (config->Wants[x].jokeredition != RETRY) &&
+                  (config->Wants[x].value == soulJoker.joker) &&
+                  ((config->Wants[x].jokeredition == No_Edition) ||
+                   (config->Wants[x].jokeredition == soulJoker.edition));
+                if (soulMatch || jokerMatch) {
+                  if (result->ScoreWants[x] == 0 || inst->params.showman == true) {
+                    result->ScoreWants[x] += 1;
+                  }
+                  if (jokerMatch && isNegative) isDesiredNegative = true;
+                }
+              }
+              if (config->scoreDesiredNegatives && isDesiredNegative) {
+                result->DesiredNegativeJokers += 1;
+              }
+            } else {
+              for (int x = 0; x < clampedNumNeeds; x++) {
+                if (config->Needs[x].value == spectralCards[t]) {
+                  ScoreNeeds[x] = true;
+                }
+              }
+              for (int x = 0; x < clampedNumWants; x++) {
+                result->ScoreWants[x] += config->Wants[x].value == spectralCards[t] ? 1 : 0;
+              }
             }
           }
-        }
-      } else if (_pack.type == Buffoon_Pack) {
-        jokerdata buffoonJokers[5];
-        buffoon_pack_detailed(buffoonJokers, _pack.size, inst, ante);
-        for (int t = 0; t < _pack.size; t++) {
-          if (buffoonJokers[t].joker == RETRY)
-            continue;
-          if (buffoonJokers[t].joker == Showman)
-            inst->params.showman = true;
-          
-          if (config->scoreNaturalNegatives) {
-            result->NaturalNegativeJokers += (buffoonJokers[t].edition == Negative);
-          }
-          bool desiredNegative = false;
+          break;
+        default:
+          break;
+      }
+    }
+
+    // After pack loop, check for Charm_Tag and missing Arcana Pack
+    if (!foundArcanaPack && smallBlindTag == Charm_Tag) {
+      item megaArcana[5];
+      arcana_pack(megaArcana, 5, inst, ante);
+      for (int i = 0; i < 5; i++) {
+        // Handle The_Soul and other cards as you do in your normal Arcana_Pack logic
+        if (megaArcana[i] == The_Soul) {
+          jokerdata soulJoker = next_joker_with_info(inst, S_Soul, ante);
           for (int x = 0; x < clampedNumNeeds; x++) {
-            bool jokerMatch =
-                (config->Needs[x].jokeredition != RETRY) &&
-                (config->Needs[x].value == buffoonJokers[t].joker) &&
-                ((config->Needs[x].jokeredition == No_Edition) ||
-                 (config->Needs[x].jokeredition == buffoonJokers[t].edition));
-            if (jokerMatch) {
+            if (config->Needs[x].value == The_Soul || config->Needs[x].value == soulJoker.joker) {
               ScoreNeeds[x] = true;
             }
-            if (jokerMatch && buffoonJokers[t].edition == Negative) {
-              desiredNegative = true;
-            }
-          }            
-          for (int x = 0; x < clampedNumWants; x++) {            
-            int jokerMatch =
-                (config->Wants[x].jokeredition != RETRY) &&
-                (config->Wants[x].value == buffoonJokers[t].joker) &&
-                ((config->Wants[x].jokeredition == No_Edition) ||
-                 (config->Wants[x].jokeredition == buffoonJokers[t].edition));
-            if (jokerMatch && (result->ScoreWants[x] == 0 || inst->params.showman == true)) {
-              result->ScoreWants[x] += 1;
-            }
-            if (jokerMatch && buffoonJokers[t].edition == Negative) {
-              desiredNegative = true;
+          }
+          for (int x = 0; x < clampedNumWants; x++) {
+            if (config->Wants[x].value == The_Soul || config->Wants[x].value == soulJoker.joker) {
+              result->ScoreWants[x]++;
             }
           }
-          if (desiredNegative && config->scoreDesiredNegatives) {
-            result->DesiredNegativeJokers += 1;
+        } else {
+          for (int x = 0; x < clampedNumNeeds; x++) {
+            if (config->Needs[x].value == megaArcana[i]) {
+              ScoreNeeds[x] = true;
+            }
+          }
+          for (int x = 0; x < clampedNumWants; x++) {
+            if (config->Wants[x].value == megaArcana[i]) {
+              result->ScoreWants[x]++;
+            }
           }
         }
       }

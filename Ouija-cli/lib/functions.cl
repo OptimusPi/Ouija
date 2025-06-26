@@ -362,8 +362,12 @@ shopitem next_shop_item(instance* inst, int ante) {
 
     double card_type = random(inst, (__private ntype[]){N_Type, N_Ante}, (__private int[]){R_Card_Type, ante}, 2) * get_total_rate(shopInstance);
     itemtype type = get_item_type(shopInstance, card_type);
-    item shopItem;
-    jokerdata shopJoker;
+    item shopItem = RETRY;
+    
+    // Initialize shopJoker with safe default values to avoid undefined behavior
+    jokerstickers defaultStickers = {false, false, false};
+    jokerdata shopJoker = {RETRY, Rarity_Common, No_Edition, defaultStickers};
+    
     if (type == ItemType_Joker) {
         shopJoker = next_joker_with_info(inst, S_Shop, ante);
         shopItem = shopJoker.joker;
