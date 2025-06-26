@@ -28,55 +28,33 @@ New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
 # Build CLI component
 Write-Host "🔨 Building Ouija CLI..." -ForegroundColor Yellow
 
-Push-Location $CLIDir
+$CLIBuildScript = Join-Path $CLIDir "build.ps1"
 try {
     # Run the existing build script (no -PrecompileKernels here)
-    & ".\build.ps1"
-    
-    if (-not (Test-Path ".\Ouija-CLI.exe")) {
+    & $CLIBuildScript
+    if (-not (Test-Path (Join-Path $CLIDir "Ouija-CLI.exe"))) {
         throw "CLI build failed - Ouija-CLI.exe not found"
     }
-    
     Write-Host "✅ CLI build successful" -ForegroundColor Green
 }
 catch {
     Write-Host "❌ CLI build failed: $_" -ForegroundColor Red
-    Pop-Location
     exit 1
-}
-finally {
-    Pop-Location
 }
 
 # Build UI component  
 Write-Host "🔨 Building Ouija UI..." -ForegroundColor Yellow
-
-Push-Location $UIDir
-try {
-    # Check if Python is available
-    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-    if (-not $pythonCmd) {
-        throw "Python not found in PATH. Please install Python 3.8+ and add it to PATH."
-    }
-    
-    Write-Host "📦 Installing Python dependencies..." -ForegroundColor Cyan
-    & python -m pip install --upgrade pip
-    & python -m pip install -r requirements.txt
-    & python -m pip install pyinstaller
-    
-    Write-Host "🔨 Building executable..." -ForegroundColor Cyan
-    & python build_exe.py
-    
-    Write-Host "✅ UI build successful" -ForegroundColor Green
+$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
+if (-not $pythonCmd) {
+    throw "Python not found in PATH. Please install Python 3.8+ and add it to PATH."
 }
-catch {
-    Write-Host "❌ UI build failed: $_" -ForegroundColor Red
-    Pop-Location
-    exit 1
-}
-finally {
-    Pop-Location
-}
+Write-Host "📦 Installing Python dependencies..." -ForegroundColor Cyan
+& python -m pip install --upgrade pip
+& python -m pip install -r (Join-Path $UIDir "requirements.txt")
+& python -m pip install pyinstaller
+Write-Host "🔨 Building executable..." -ForegroundColor Cyan
+& python (Join-Path $UIDir "build_exe.py")
+Write-Host "✅ UI build successful" -ForegroundColor Green
 
 # Remove all .bin files from ouija_filters only before packaging
 Write-Host "🧹 Removing all .bin files (OpenCL binaries) from ouija_filters..." -ForegroundColor Yellow

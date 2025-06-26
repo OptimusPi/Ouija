@@ -1,6 +1,6 @@
 #include "lib/ouija.cl"
 
-void ouija_filter(instance *inst, __constant OuijaConfig *config, __global OuijaResult *result) {
+void ouija_filter(instance *inst, __constant OuijaConfig *config, OuijaResult *result) {
   set_deck(inst, Erratic_Deck);
   
   // Fixed order: _2, _3, _4, _5, _6, _7, _8, _9, _10, Jack, Queen, King, Ace

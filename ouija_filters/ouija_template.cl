@@ -3,8 +3,7 @@
 // #define _debugPrintsMAGIC
 // #define _debugPrints1
 
-void ouija_filter(instance *inst, __constant OuijaConfig *config,
-                  __global OuijaResult *result) {
+void ouija_filter(instance *inst, __constant OuijaConfig *config, OuijaResult *result) {
 
   // Use faster primitive initialization
   bool valid = true;
@@ -13,7 +12,6 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
   result->NaturalNegativeJokers = 0;
   result->DesiredNegativeJokers = 0;
 
-  // Initialize ScoreWants array explicitly (host clearing was unreliable)
   for (int i = 0; i < MAX_DESIRES_KERNEL; i++) {
     result->ScoreWants[i] = 0;
   }
@@ -29,8 +27,6 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
     clampedNumWants = MAX_DESIRES_KERNEL;
   if (clampedNumWants < 0)
     clampedNumWants = 0;
-
-  // Memory fence
 
 #ifdef _debugPrints
   printf("[Kernel] Starting filter\n");

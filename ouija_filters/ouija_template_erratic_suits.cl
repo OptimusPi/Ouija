@@ -1,7 +1,7 @@
 #include "lib/ouija.cl"
 
 void ouija_filter(instance *inst, __constant OuijaConfig *config,
-                  __global OuijaResult *result) {
+                  OuijaResult *result) {
   set_deck(inst, Erratic_Deck);
 
   int suit_counts[4] = {0, 0, 0, 0};

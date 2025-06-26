@@ -8,7 +8,7 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
 $BuildDir = Join-Path $ScriptDir "build"
 $OuijaExecutablePath = Join-Path $BuildDir "Release\\Ouija-CLI.exe" # Changed to Ouija-CLI.exe
-$FiltersDir = Join-Path $ScriptDir "ouija_filters"
+$FiltersDir = Join-Path $ScriptDir "..\ouija_filters"
 
 # Read version from version.ouija.txt
 $Version = Get-Content "$PSScriptRoot\..\version.ouija.txt" | Select-Object -First 1
@@ -60,21 +60,15 @@ if (-not (Test-Path $BuildDir)) {
 
 # 3. Configure and Build (CMake example)
 Write-Host "Navigating to build directory: $BuildDir"
-Push-Location $BuildDir
 
 try {
     Write-Host "Configuring project with CMake..."
-    cmake ..  # Assumes CMakeLists.txt is in $ScriptDir (parent of $BuildDir)
-              # Add generator if needed, e.g., cmake .. -G "Visual Studio 17 2022"
-
+    cmake -S "$ScriptDir" -B "$BuildDir"  # Configure from root, output to build dir
     Write-Host "Building project (Release configuration)..."
-    cmake --build . --config Release
-    # For MSBuild directly if you have a solution (adjust path/name as needed):
-    # msbuild Ouija.sln /p:Configuration=Release
-
-    $ouijaExeSource = Join-Path $BuildDir "Release" "Ouija-CLI.exe" # Changed to Ouija-CLI.exe
+    cmake --build "$BuildDir" --config Release
+    $ouijaExeSource = Join-Path $BuildDir "Release" "Ouija-CLI.exe"
     if (Test-Path $ouijaExeSource) {
-        $ouijaExeTarget = Join-Path $ScriptDir "Ouija-CLI.exe" # Changed to Ouija-CLI.exe
+        $ouijaExeTarget = Join-Path $ScriptDir "Ouija-CLI.exe"
         Copy-Item -Path $ouijaExeSource -Destination $ouijaExeTarget -Force
         Write-Host "Build completed successfully."
     } else {
@@ -85,15 +79,6 @@ try {
 
     # 4. Precompile Kernels (if -PrecompileKernels is specified and build was successful)
     if ($PrecompileKernels) {
-        # This block should be correctly placed after the build commands.
-        # Ensure current directory is the script's root directory ($ScriptDir or $PSScriptRoot)
-        # If the build happens in a different location, ensure you are back in the root.
-        # The Pop-Location / Push-Location logic from your previous script version is good here.
-        if ($PWD.Path -eq $BuildDir) {
-            Pop-Location # Go back to $ScriptDir from $BuildDir
-        }
-        Push-Location $PSScriptRoot # Ensure we are in the script's root directory
-
         Write-Host "Pre-compiling OpenCL kernels..."
         $sourceExePath = Join-Path $BuildDir "Release" "Ouija-CLI.exe" # Changed to Ouija-CLI.exe
         
@@ -104,55 +89,15 @@ try {
             try {
                 Write-Host "Copying $sourceExePath to $ouijaExeInRootDir for pre-compilation."
                 Copy-Item -Path $sourceExePath -Destination $ouijaExeInRootDir -Force
-                
-                # --- Main Kernel Pre-compilation (Parallel with filters) ---
-                Write-Host "--------------------------------------------------"
-                Write-Host "Pre-compiling main kernel: lib\ouija_search.cl (in parallel with filters)"
-                Write-Host "Ouija executable for main kernel: $ouijaExeInRootDir"
-                Write-Host "--------------------------------------------------"
-                $jobs = @()                # Add main kernel job
-                $mainKernelScriptBlock = {
-                    param($currentCopiedExePath)
-                    $mainKernelArgs = @("-n", "0")
-                    Write-Host "Starting job for main kernel: lib\ouija_search.cl"
-                    try {
-                        $process = Start-Process -FilePath $currentCopiedExePath -ArgumentList $mainKernelArgs -Wait -PassThru -RedirectStandardOutput "main_kernel_stdout.txt" -RedirectStandardError "main_kernel_stderr.txt" -NoNewWindow
-                        $stdout = Get-Content "main_kernel_stdout.txt" -Raw 2>$null
-                        $stderr = Get-Content "main_kernel_stderr.txt" -Raw 2>$null
-                        
-                        if ($process.ExitCode -ne 0) {
-                            $errorMsg = "Main kernel compilation failed with exit code $($process.ExitCode)"
-                            if ($stderr) {
-                                $errorMsg += "`nSTDERR: $stderr"
-                            }
-                            if ($stdout) {
-                                $errorMsg += "`nSTDOUT: $stdout"
-                            }
-                            throw $errorMsg
-                        } else {
-                            Write-Host "Main kernel compilation completed successfully"
-                            if ($stdout) {
-                                Write-Host "STDOUT: $stdout"
-                            }
-                        }
-                    } finally {
-                        # Clean up temporary files
-                        Remove-Item "main_kernel_stdout.txt" -ErrorAction SilentlyContinue
-                        Remove-Item "main_kernel_stderr.txt" -ErrorAction SilentlyContinue
-                    }
-                }
-                $jobs += Start-Job -ScriptBlock $mainKernelScriptBlock -ArgumentList $ouijaExeInRootDir
-
-                # --- Filter Kernels Pre-compilation (Parallel) ---
                 Write-Host "--------------------------------------------------"
                 Write-Host "Starting parallel pre-compilation of Ouija filter kernels (ouija_*.cl)..."
                 Write-Host "Ouija executable for filters: $ouijaExeInRootDir"
-                $filtersSourceDir = Join-Path $PSScriptRoot "ouija_filters"
+                $filtersSourceDir = Join-Path $PSScriptRoot "..\ouija_filters"
                 Write-Host "Filters directory: $filtersSourceDir"
                 Write-Host "--------------------------------------------------"
 
                 $filterFiles = Get-ChildItem -Path $filtersSourceDir -Filter "ouija_*.cl"
-
+                $jobs = @()
                 foreach ($file in $filterFiles) {
                     $filterName = $file.BaseName
                     $scriptBlock = {
@@ -183,8 +128,8 @@ try {
                             }
                         } finally {
                             # Clean up temporary files
-                            Remove-Item "filter_${currentFilterName}_stdout.txt" -ErrorAction SilentlyContinue
-                            Remove-Item "filter_${currentFilterName}_stderr.txt" -ErrorAction SilentlyContinue
+                            Remove-Item $stdoutFile -ErrorAction SilentlyContinue
+                            Remove-Item $stderrFile -ErrorAction SilentlyContinue
                         }
                     }
                     $jobs += Start-Job -ScriptBlock $scriptBlock -ArgumentList $ouijaExeInRootDir, $filterName
@@ -212,17 +157,12 @@ try {
                 Write-Error "An error occurred during the pre-compilation process: $($_.Exception.Message)"
             }
         }
-        Pop-Location # Match the Push-Location $PSScriptRoot
         Write-Host "Kernel pre-compilation section finished."
     }
 
 } catch {
     Write-Error "Build process failed: $($_.Exception.Message)"
     exit 1
-} finally {
-    if ($PWD.Path -eq $BuildDir) {
-        Pop-Location
-    }
 }
 
 Write-Host "✅ Build script finished."
