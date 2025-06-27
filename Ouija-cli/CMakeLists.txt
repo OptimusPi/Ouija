@@ -28,14 +28,6 @@ endif()
 
 add_executable(Ouija-CLI ${OUIJA_CLI_SOURCES})
 
-# Always copy Ouija-CLI.exe to the project root after build
-add_custom_command(TARGET Ouija-CLI POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<TARGET_FILE:Ouija-CLI>
-        "${CMAKE_SOURCE_DIR}/../Ouija-CLI.exe"
-    COMMENT "Copying Ouija-CLI.exe to project root after build"
-)
-
 target_link_libraries(Ouija-CLI PRIVATE OpenCL::OpenCL)
 
 set_target_properties(Ouija-CLI PROPERTIES C_STANDARD 11
@@ -79,8 +71,3 @@ else()
     # You might need to manually specify the include path if the toolchain file isn't used
     # include_directories(path/to/vcpkg/installed/x64-windows/include)
 endif()
-
-# Read version from version.ouija.txt and define OUIJA_VERSION
-file(READ "${CMAKE_SOURCE_DIR}/../version.ouija.txt" OUIJA_VERSION_TXT)
-string(STRIP "${OUIJA_VERSION_TXT}" OUIJA_VERSION_TXT)
-target_compile_definitions(Ouija-CLI PRIVATE OUIJA_VERSION="${OUIJA_VERSION_TXT}")

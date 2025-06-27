@@ -3,7 +3,8 @@
 // #define _debugPrintsMAGIC
 // #define _debugPrints1
 
-void ouija_filter(instance *inst, __constant OuijaConfig *config, OuijaResult *result) {
+void ouija_filter(instance *inst, __constant OuijaConfig *config,
+                  __global OuijaResult *result) {
 
   // Use faster primitive initialization
   bool valid = true;
@@ -156,11 +157,6 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config, OuijaResult *r
             for (int x = 0; x < clampedNumNeeds; x++) {
               if (config->Needs[x].value == consumables[i]) {
                 ScoreNeeds[x] = true;
-              }
-            }
-            for (int x = 0; x < clampedNumWants; x++) {
-              if (config->Wants[x].value == consumables[i]) {
-                result->ScoreWants[x]++;
               }
             }
           }

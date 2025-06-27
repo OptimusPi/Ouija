@@ -5,30 +5,28 @@ Automated setup script for the Ouija project.
 This script sets up the Python environment, installs dependencies, configures the C/OpenCL build, and runs the application.
 #>
 
-# Use script root for all paths, never change directory
-$ScriptRoot = $PSScriptRoot
-
 Write-Host "🚀 Starting automated setup for Ouija project..." -ForegroundColor Green
+
+# Ensure the script always starts in the root directory
+Set-Location -Path "$(Split-Path -Path $MyInvocation.MyCommand.Definition -Parent)"
 
 # Step 1: Set up Python virtual environment
 Write-Host "🔧 Setting up Python virtual environment..." -ForegroundColor Cyan
-$venvPath = Join-Path $ScriptRoot ".venv"
-if (-Not (Test-Path $venvPath)) {
-    python -m venv $venvPath
+if (-Not (Test-Path ".venv")) {
+    python -m venv .venv
     if ($LASTEXITCODE -ne 0) {
         Write-Error "❌ Failed to create virtual environment. Ensure Python is installed and in PATH."
         exit 1
     }
 }
-& (Join-Path $venvPath "Scripts\Activate.ps1")
+& .\.venv\Scripts\Activate.ps1
 Write-Host "✅ Virtual environment activated."
 
 # Step 2: Install Python dependencies
 Write-Host "📦 Installing Python dependencies..." -ForegroundColor Cyan
-$requirements = Join-Path $ScriptRoot "Ouija-ui\requirements.txt"
-if (Test-Path $requirements) {
+if (Test-Path "Ouija-ui\requirements.txt") {
     pip install --upgrade pip
-    pip install -r $requirements
+    pip install -r Ouija-ui\requirements.txt
     if ($LASTEXITCODE -ne 0) {
         Write-Error "❌ Failed to install Python dependencies."
         exit 1
@@ -39,31 +37,49 @@ if (Test-Path $requirements) {
     exit 1
 }
 
-# Check for required runtime files/folders in root
-$required = @("Ouija-CLI.exe", "lib", "ouija_filters", "ouija_configs")
-foreach ($item in $required) {
-    if (-not (Test-Path (Join-Path $ScriptRoot $item))) {
-        Write-Error "❌ Required file/folder missing in root: $item. Please run build.ps1 first."
-        exit 1
-    }
-}
-
 # Step 3: Build the C/OpenCL project using the dedicated build script
 Write-Host "🔨 Building C/OpenCL project..." -ForegroundColor Cyan
-$buildScript = Join-Path $ScriptRoot "Ouija-cli\build.ps1"
-& $buildScript
+& "Ouija-cli\build.ps1"
 if ($LASTEXITCODE -ne 0) {
     Write-Error "❌ Build failed. Check the output for errors."
     exit 1
 }
 Write-Host "✅ Build complete."
 
-# Step 4: Run the application
+# Step 4: Copy Ouija-CLI.exe and lib folder to root directory
+Write-Host "📋 Copying Ouija-CLI.exe and lib folder to root directory..." -ForegroundColor Cyan
+if (Test-Path "Ouija-cli\Ouija-CLI.exe") {
+    Copy-Item "Ouija-cli\Ouija-CLI.exe" "." -Force
+    Write-Host "✅ Ouija-CLI.exe copied to root directory."
+} else {
+    Write-Error "❌ Ouija-CLI.exe not found in Ouija-cli directory."
+    exit 1
+}
+
+if (Test-Path "Ouija-cli\lib") {
+    if (Test-Path "lib") {
+        Remove-Item "lib" -Recurse -Force
+    }
+    Copy-Item "Ouija-cli\lib" "." -Recurse -Force
+    Write-Host "✅ lib folder copied to root directory."
+} else {
+    Write-Error "❌ lib folder not found in Ouija-cli directory."
+    exit 1
+}
+
+# Also copy precompile_kernels.ps1 for kernel recompilation
+if (Test-Path "Ouija-cli\precompile_kernels.ps1") {
+    Copy-Item "Ouija-cli\precompile_kernels.ps1" "." -Force
+    Write-Host "✅ precompile_kernels.ps1 copied to root directory."
+} else {
+    Write-Error "❌ precompile_kernels.ps1 not found in Ouija-cli directory."
+    exit 1
+}
+
+# Step 5: Run the application
 Write-Host "🚀 Running the application..." -ForegroundColor Green
-$appPy = Join-Path $ScriptRoot "Ouija-ui\app.py"
-if (Test-Path $appPy) {
-    Write-Host "💡 Tip: For best results in VS Code, select the .venv as your Python interpreter (Ctrl+Shift+P → Python: Select Interpreter)." -ForegroundColor Yellow
-    python $appPy
+if (Test-Path "Ouija-ui\app.py") {
+    python "Ouija-ui\app.py"
     if ($LASTEXITCODE -ne 0) {
         Write-Error "❌ Failed to run the application."
         exit 1

@@ -181,6 +181,17 @@ class RunSettingsWidget:
         except RuntimeError as e:
             print(f"Error scheduling write_to_console: {e}")
 
+    def on_run_search(self):
+        """Handle run search button clicks"""
+        if self.search_running:
+            self.controller.stop_search()
+        else:
+            # Save the current configuration before starting the search
+            self.controller.save_config()
+            # Pass the starting seed value to the controller
+            starting_seed = self.starting_seed_var.get()
+            self.controller.run_search(starting_seed=starting_seed)
+
     def update_display(self):
         """Update the GPU settings display with current settings"""
         # Access settings directly from the controller's config_model
@@ -194,15 +205,17 @@ class RunSettingsWidget:
     def update_kernel_button_state(self, search_running):
         """Update the run button state based on kernel status"""
         self.search_running = search_running
-        # Always prioritize build-running state
-        if hasattr(self.controller, 'build_controller') and self.controller.build_controller.is_build_running():
-            self.run_button.config(text="PLEASE WAIT...", bg="#FFA500", state="disabled")
-        elif self.controller.is_kernel_build_needed():
-            self.run_button.config(text="Build Kernels First", bg=YELLOW, state="normal")
-        elif search_running:
-            self.run_button.config(text="STOP SEARCH", bg=RED, state="normal")
+        if search_running:
+            self.run_button.config(text="STOP SEARCH", bg=RED)
         else:
-            self.run_button.config(text="Let Jimbo Cook!", bg=BLUE, state="normal")
+            # Check if kernel build is currently running
+            if hasattr(self.controller, 'build_controller') and self.controller.build_controller.is_build_running():
+                self.run_button.config(text="PLEASE WAIT...", bg="#FFA500", state="disabled")
+            # Check if kernel build is needed
+            elif self.controller.is_kernel_build_needed():
+                self.run_button.config(text="Build Kernels First", bg=YELLOW, state="normal")
+            else:
+                self.run_button.config(text="Let Jimbo Cook!", bg=BLUE, state="normal")
 
     def set_search_running(self, is_running):
         """Update search running state"""
@@ -233,12 +246,6 @@ class RunSettingsWidget:
 
     def on_run_search(self):
         """Handle run search button clicks"""
-        if self.controller.is_kernel_build_needed():
-            # Start kernel build, update button state and status immediately
-            self.main_window.set_status("Building kernels...")
-            self.controller.run_kernel_build(on_complete=self.update_kernel_button_state)
-            self.update_kernel_button_state(False)
-            return
         if self.search_running:
             self.controller.stop_search()
         else:

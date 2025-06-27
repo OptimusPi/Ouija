@@ -82,7 +82,7 @@ class BuildController:
                 self.current_view.run_settings_widget.update_kernel_button_state(False)
 
         try:
-            self._run_build_script(on_complete=lambda: self.current_view.run_settings_widget.update_kernel_button_state(False))
+            self._run_build_script(on_complete=build_done)
             return Result.success("Kernel build started")
         except Exception as e:
             self.build_running = False
