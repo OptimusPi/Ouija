@@ -7,17 +7,11 @@ param (
 $ErrorActionPreference = "Stop"
 $ScriptDir = $PSScriptRoot
 $BuildDir = Join-Path $ScriptDir "build"
-$OuijaExecutablePath = Join-Path $BuildDir "Release\\Ouija-CLI.exe" # Changed to Ouija-CLI.exe
+$OuijaExecutablePath = Join-Path $BuildDir "Release\Ouija-CLI.exe" # Output is always in root/build/Release
 $FiltersDir = Join-Path $ScriptDir "ouija_filters"
 
-# Load version from version.ouija.txt
-$VersionFile = Join-Path $ScriptDir "version.ouija.txt"
-if (-not (Test-Path $VersionFile)) {
-    Write-Host "ERROR: version.ouija.txt not found at $VersionFile" -ForegroundColor Red
-    exit 1
-}
-$Version = Get-Content $VersionFile | Select-Object -First 1
-Write-Host "Loaded version: $Version"
+# Read version from version.ouija.txt
+$Version = Get-Content "$PSScriptRoot\version.ouija.txt" | Select-Object -First 1
 
 Write-Host "Build script started..."
 Write-Host "Workspace Root: $ScriptDir"
@@ -233,3 +227,14 @@ try {
 
 Write-Host "✅ Build script finished."
 Write-Host ""
+
+# Example for MSVC (cl.exe):
+# $compileFlags = "/D OUIJA_VERSION=\"$Version\" ...other flags..."
+# cl.exe $compileFlags ...
+
+# Example for GCC/Clang:
+# $compileFlags = "-DOUIJA_VERSION=\"$Version\" ...other flags..."
+# gcc $compileFlags ...
+
+# If using CMake, add -DOUIJA_VERSION=\"$Version\" to CMAKE_C_FLAGS or as a -D argument:
+# cmake -DOUIJA_VERSION=$Version ...
