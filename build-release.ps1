@@ -10,7 +10,7 @@ Write-Host "🔨 Ouija Complete Build Script v$Version" -ForegroundColor Cyan
 Write-Host "=======================================" -ForegroundColor Cyan
 
 $RootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$CLIDir = Join-Path $RootDir "Ouija-cli"
+$CLIDir = $RootDir # CLI is always in root
 $UIDir = Join-Path $RootDir "Ouija-ui"
 $DistDir = Join-Path $RootDir "distribution"
 

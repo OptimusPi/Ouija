@@ -39,40 +39,20 @@ if (Test-Path "Ouija-ui\requirements.txt") {
 
 # Step 3: Build the C/OpenCL project using the dedicated build script
 Write-Host "🔨 Building C/OpenCL project..." -ForegroundColor Cyan
-& "Ouija-cli\build.ps1"
+& ".\build.ps1"
 if ($LASTEXITCODE -ne 0) {
     Write-Error "❌ Build failed. Check the output for errors."
     exit 1
 }
 Write-Host "✅ Build complete."
 
-# Step 4: Copy Ouija-CLI.exe and lib folder to root directory
-Write-Host "📋 Copying Ouija-CLI.exe and lib folder to root directory..." -ForegroundColor Cyan
-if (Test-Path "Ouija-cli\Ouija-CLI.exe") {
-    Copy-Item "Ouija-cli\Ouija-CLI.exe" "." -Force
-    Write-Host "✅ Ouija-CLI.exe copied to root directory."
-} else {
-    Write-Error "❌ Ouija-CLI.exe not found in Ouija-cli directory."
-    exit 1
-}
+# Step 4: No need to copy CLI exe or lib folder, everything is in root now
 
-if (Test-Path "Ouija-cli\lib") {
-    if (Test-Path "lib") {
-        Remove-Item "lib" -Recurse -Force
-    }
-    Copy-Item "Ouija-cli\lib" "." -Recurse -Force
-    Write-Host "✅ lib folder copied to root directory."
+# Also copy precompile_kernels.ps1 for kernel recompilation if needed
+if (Test-Path "precompile_kernels.ps1") {
+    Write-Host "✅ precompile_kernels.ps1 present in root directory."
 } else {
-    Write-Error "❌ lib folder not found in Ouija-cli directory."
-    exit 1
-}
-
-# Also copy precompile_kernels.ps1 for kernel recompilation
-if (Test-Path "Ouija-cli\precompile_kernels.ps1") {
-    Copy-Item "Ouija-cli\precompile_kernels.ps1" "." -Force
-    Write-Host "✅ precompile_kernels.ps1 copied to root directory."
-} else {
-    Write-Error "❌ precompile_kernels.ps1 not found in Ouija-cli directory."
+    Write-Error "❌ precompile_kernels.ps1 not found in root directory."
     exit 1
 }
 

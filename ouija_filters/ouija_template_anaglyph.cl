@@ -98,7 +98,6 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
               ((config->Wants[x].jokeredition == No_Edition) ||
                (config->Wants[x].jokeredition == shItem.joker.edition))) {
             isDesiredJoker = true;
-            break;
           }
         }
 
@@ -144,8 +143,22 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
         bool regularMatch = (config->Wants[x].value == shItem.value) &&
                             (shItem.type != ItemType_Joker);
 
-        if (config->Wants[x].value == shItem.value && shItem.type != ItemType_Joker) {
+        if (regularMatch || jokerMatch) {
           result->ScoreWants[x] += 1;        
+        }
+      }
+
+      // Score wants from shop with proper slot management
+      for (int x = 0; x < clampedNumNeeds; x++) {
+        bool jokerMatch = (shItem.type == ItemType_Joker) &&
+                          (config->Needs[x].jokeredition != RETRY) &&
+                          (config->Needs[x].value == shItem.joker.joker) &&
+                          ((config->Needs[x].jokeredition == No_Edition) ||
+                           (config->Needs[x].jokeredition == shItem.joker.edition));
+        bool regularMatch = (config->Needs[x].value == shItem.value) &&
+                            (shItem.type != ItemType_Joker);
+        if (regularMatch || jokerMatch) {
+          ScoreNeeds[x] = true;
         }
       }
     }
@@ -193,15 +206,9 @@ void ouija_filter(instance *inst, __constant OuijaConfig *config,
     }
   }  // Calculate final score
   if (valid) {
-    int wants_score = 0;
-    for (int w = 0; w < clampedNumWants; w++) {
-      wants_score += result->ScoreWants[w] > 0 ? 1 : 0;
-    }
-    result->TotalScore += wants_score;
-    
     // Add negative joker scores based on configuration
     if (config->scoreNaturalNegatives) {
-      result->TotalScore += result->NaturalNegativeJokers;
+      result->TotalScore += (int)(result->NaturalNegativeJokers * 0.5);
     }
     if (config->scoreDesiredNegatives) {
       result->TotalScore += result->DesiredNegativeJokers;

@@ -4,7 +4,7 @@ project(Ouija LANGUAGES C)
 
 find_package(OpenCL REQUIRED)
 
-# Add Windows icon resource for Ouija-CLI.exe
+# Add Windows icon resource for Ouija-CLI.exe (icon is in project root)
 if (WIN32)
     set(OUIJA_ICON "${CMAKE_CURRENT_SOURCE_DIR}/icon.ouija.ico")
     set(OUIJA_RC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/ouija.rc")
